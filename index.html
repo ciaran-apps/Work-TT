@@ -131,7 +131,6 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
 .mcol{position:relative;height:100%;display:flex;align-items:flex-end;justify-content:center;min-width:0}
 .mcol .b{width:min(70%,44px);background:var(--accent);border-radius:4px 4px 0 0;min-height:0}
 .mcol.future .b{background:var(--accent-soft)}
-.mcol .tg{position:absolute;left:8%;right:8%;height:0;border-top:2px dashed var(--ink)}
 .mcol .vl{position:absolute;left:0;right:0;text-align:center;font-family:var(--f-mono);font-size:.72rem;font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap}
 .mcol:hover .b,.mcol:focus-visible .b{filter:brightness(1.12)}
 .mcol:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -311,7 +310,7 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     </div>
     <div class="cal" id="cal"></div>
     <div class="legend">
-      <span><i class="sw" style="background:var(--ok)"></i>7.5h or more (week: target met)</span>
+      <span><i class="sw" style="background:var(--ok)"></i>7.5h or more</span>
       <span><i class="sw" style="background:var(--ok-mid)"></i>3.75h or more</span>
       <span><i class="sw" style="background:var(--warn)"></i>Under 3.75h</span>
       <span><i class="sw" style="background:var(--hol)"></i>Holiday (still in target)</span>
@@ -324,12 +323,11 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
   <section class="panel" aria-labelledby="moTitle" data-pane="calendar" hidden>
     <div class="phead">
       <h2 id="moTitle">Hours by month</h2>
-      <span class="muted" style="font-size:.8rem">Bar = hours logged · line = 7.5h × working days</span>
     </div>
     <div class="mchart" id="mchart"></div>
     <div class="tablewrap">
       <table>
-        <thead><tr><th>Month</th><th>Logged</th><th>Target</th><th>%</th></tr></thead>
+        <thead><tr><th>Month</th><th>Hours</th></tr></thead>
         <tbody id="mRows"></tbody>
       </table>
     </div>
@@ -641,15 +639,13 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
         <span class="meter">${wW?`<i class="w" style="width:${Math.min(100,logged/((DAY-c)||DAY)*100)}%"></i>`:""}</span>
       </button>`;
       }
-      // Weekly total: all hours Mon–Sun against 7.5h × each working day that week (holidays count, office-closed days don't)
+      // Weekly total: all hours logged Mon–Sun
       let wLogged=0, wTarget=0, wEnd=0;
       for(let i=0;i<7;i++){ const x=new Date(w); x.setDate(w.getDate()+i); const s=iso(x), k=kind(s,closed), l=sumMins(days[s]||[]);
         wLogged+=l; if(i>4) wEnd+=l; if(k!=="weekend" && k!=="closed") wTarget+=DAY; }
-      const wBand = !wLogged ? "" : !wTarget || wLogged>=wTarget ? "met" : wLogged>=wTarget/2 ? "halfmet" : "part";
-      html += `<div class="cell wk ${wBand}" role="group" aria-label="Week of ${esc(fmtShort(iso(w)))}: ${fmtMins(wLogged)} of ${fmtMins(wTarget)}">
+      html += `<div class="cell wk" role="group" aria-label="Week of ${esc(fmtShort(iso(w)))}: ${fmtMins(wLogged)} logged">
         <span class="dn">Total</span>
-        <span><span class="hrs">${wLogged || iso(w)<=t ? fmtMins(wLogged) : ""}</span>${wTarget?`<span class="of" style="display:block">/ ${fmtMins(wTarget)}</span>`:""}${wEnd?`<span class="of" style="display:block" title="Includes ${fmtMins(wEnd)} logged on Sat/Sun">+${fmtMins(wEnd)} w/e</span>`:""}</span>
-        <span class="meter">${wLogged?`<i class="w" style="width:${Math.min(100, wTarget? wLogged/wTarget*100 : 100)}%"></i>`:""}</span>
+        <span><span class="hrs">${wLogged || iso(w)<=t ? fmtMins(wLogged) : ""}</span>${wEnd?`<span class="of" style="display:block" title="Includes ${fmtMins(wEnd)} logged on Sat/Sun">+${fmtMins(wEnd)} w/e</span>`:""}</span>
       </div>`;
     }
     $("cal").innerHTML = html;
@@ -670,21 +666,19 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
       mo++; if(mo>11){ mo=0; y++; }
     }
     const shown = months.slice(-12);
-    const max = Math.max(1, ...shown.map(x=>Math.max(x.logged, x.target)));
-    const pct = x => x.target ? Math.round(x.logged/x.target*100)+"%" : "—";
+    const max = Math.max(1, ...shown.map(x=>x.logged));
     $("mchart").innerHTML = shown.map(x=>{
-      const bh = x.logged/max*100, th = x.target/max*100, top = Math.max(bh, th);
-      const tip = `${x.full}: ${fmtMins(x.logged)} logged of ${fmtMins(x.target)} target (${pct(x)})`;
+      const bh = x.logged/max*100, top = bh;
+      const tip = `${x.full}: ${fmtMins(x.logged)} logged`;
       return `<div class="mcol ${x.future?"future":""}" tabindex="0" title="${esc(tip)}" aria-label="${esc(tip)}">
         <div class="b" style="height:${bh}%"></div>
-        ${x.target?`<div class="tg" style="bottom:${th}%"></div>`:""}
         <div class="vl" style="bottom:calc(${top}% + 4px)">${x.logged?fmtMins(x.logged):""}</div>
       </div>`;
     }).join("") ;
     let lab = document.getElementById("mlabels");
     if(!lab){ lab=document.createElement("div"); lab.id="mlabels"; lab.className="mlabels"; $("mchart").after(lab); }
     lab.innerHTML = shown.map(x=>`<span class="${x.cur?"cur":""}">${esc(x.label)}</span>`).join("");
-    $("mRows").innerHTML = shown.slice().reverse().map(x=>`<tr class="${x.cur?"next":""}"><td>${esc(x.full)}</td><td>${fmtMins(x.logged)}</td><td>${fmtMins(x.target)}</td><td>${pct(x)}</td></tr>`).join("");
+    $("mRows").innerHTML = shown.slice().reverse().map(x=>`<tr class="${x.cur?"next":""}"><td>${esc(x.full)}</td><td>${fmtMins(x.logged)}</td></tr>`).join("");
   }
   function renderDay(){
     const s = state.sel, box=$("dayview");
