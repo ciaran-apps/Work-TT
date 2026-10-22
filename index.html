@@ -1105,11 +1105,26 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
   let cloud = null;  // { entries: CollectionReference, settings: DocumentReference, stop() }
   const saveLocal = () => { try{ localStorage.setItem(STORE_KEY, JSON.stringify(store)); }catch(_){} };
   const cloudFail = () => window.Cloud && Cloud.note("Sync problem: changes are saved here and will retry");
-  function cloudPut(id){ if(cloud && store.entries[id]) cloud.entries.doc(id).set(Cloud.clean(store.entries[id])).catch(cloudFail); }
-  function cloudDel(id){ if(cloud) cloud.entries.doc(id).delete().catch(cloudFail); }
-  function cloudSettings(){ if(cloud && store.settings) cloud.settings.set(Cloud.clean(store.settings)).catch(cloudFail); }
-  function cloudTPut(id){ if(cloud && store.tickets[id]) cloud.tickets.doc(id).set(Cloud.clean(store.tickets[id])).catch(cloudFail); }
-  function cloudTDel(id){ if(cloud) cloud.tickets.doc(id).delete().catch(cloudFail); }
+  // Changes made before sync connects (the first moments after opening, or while
+  // signed out) are remembered here and uploaded as soon as it does, so the
+  // cloud copy arriving can never wipe them.
+  const PENDING_KEY = "ticket-time-tracker-pending";
+  let pending = { e:{}, t:{}, s:false };
+  try{ const pr = JSON.parse(localStorage.getItem(PENDING_KEY)||"null"); if(pr && pr.e && pr.t) pending = pr; }catch(_){}
+  const savePending = () => { try{ localStorage.setItem(PENDING_KEY, JSON.stringify(pending)); }catch(_){} };
+  function markPending(kind, id, op){ if(kind==="s") pending.s = true; else pending[kind][id] = op; savePending(); }
+  function flushPending(c){
+    // Hand everything to Firestore's own queue (kept on the device and retried until it reaches the server).
+    Object.entries(pending.e).forEach(([id,op])=>{ op==="del" ? c.entries.doc(id).delete().catch(cloudFail) : (store.entries[id] && c.entries.doc(id).set(Cloud.clean(store.entries[id])).catch(cloudFail)); });
+    Object.entries(pending.t).forEach(([id,op])=>{ op==="del" ? c.tickets.doc(id).delete().catch(cloudFail) : (store.tickets[id] && c.tickets.doc(id).set(Cloud.clean(store.tickets[id])).catch(cloudFail)); });
+    if(pending.s && store.settings) c.settings.set(Cloud.clean(store.settings)).catch(cloudFail);
+    pending = { e:{}, t:{}, s:false }; savePending();
+  }
+  function cloudPut(id){ if(cloud && store.entries[id]) cloud.entries.doc(id).set(Cloud.clean(store.entries[id])).catch(cloudFail); else if(!cloud) markPending("e", id, "put"); }
+  function cloudDel(id){ if(cloud) cloud.entries.doc(id).delete().catch(cloudFail); else markPending("e", id, "del"); }
+  function cloudSettings(){ if(cloud && store.settings) cloud.settings.set(Cloud.clean(store.settings)).catch(cloudFail); else if(!cloud) markPending("s"); }
+  function cloudTPut(id){ if(cloud && store.tickets[id]) cloud.tickets.doc(id).set(Cloud.clean(store.tickets[id])).catch(cloudFail); else if(!cloud) markPending("t", id, "put"); }
+  function cloudTDel(id){ if(cloud) cloud.tickets.doc(id).delete().catch(cloudFail); else markPending("t", id, "del"); }
   async function cloudReplaceAll(){
     if(!cloud) return;
     try{
@@ -1139,9 +1154,14 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
         const s = await c.settings.get();
         if(!s.exists && store.settings) await c.settings.set(Cloud.clean(store.settings));
         Cloud.markMigrated("worktt"); Cloud.note("");
+        // deletions made before this first sign-in still need applying
+        Object.entries(pending.e).forEach(([id,op])=>{ if(op==="del") c.entries.doc(id).delete().catch(cloudFail); });
+        Object.entries(pending.t).forEach(([id,op])=>{ if(op==="del") c.tickets.doc(id).delete().catch(cloudFail); });
+        pending = { e:{}, t:{}, s:false }; savePending();
       }
     }catch(_){ Cloud.note("Couldn't reach your account, so entries stay on this device for now. Reload to try again."); updateStatus(); return; }
     if(Cloud.user!==u) return;
+    if(Cloud.migrated("worktt")) flushPending(c);
     const u1 = c.entries.onSnapshot(s=>{ if(s.metadata.fromCache && s.empty && Object.keys(store.entries).length) return; // wait for the server rather than blank the list
       store.entries={}; s.docs.forEach(d=>{ store.entries[d.id]=d.data(); }); saveLocal(); notify(); }, cloudFail);
     const u2 = c.settings.onSnapshot(s=>{ if(s.exists){ store.settings=s.data(); saveLocal(); notify(); } }, cloudFail);
