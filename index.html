@@ -282,6 +282,7 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     <div class="headline">
       <div class="big"><span class="k">Quarter target</span><span class="v" id="fqTarget">0h</span><span class="s" id="fqTargetSub"></span></div>
       <div class="big"><span class="k">Logged so far</span><span class="v" id="fqLogged">0h</span><span class="s" id="fqLoggedSub"></span></div>
+      <div class="big"><span class="k">Working days left</span><span class="v" id="fqDays">0</span><span class="s" id="fqDaysSub"></span></div>
       <div class="big"><span class="k">Projected bonus</span><span class="v money" id="fqBonus">—</span><span class="s" id="fqBonusSub"></span></div>
     </div>
     <div class="ladder" aria-hidden="true">
@@ -498,9 +499,10 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
   // Full quarter: target over every working day, and what the rest of the quarter needs
   function fullQuarterStats(){
     const { start, end } = quarterBounds(), t = todayIso(), closed = closedSet(), days = byDate();
-    let target=0, totalDays=0, capPast=0, loggedPast=0, capLeft=0, daysLeft=0, holLeft=0;
+    let target=0, totalDays=0, capPast=0, loggedPast=0, capLeft=0, daysLeft=0, holLeft=0, closedLeft=0;
     for(let s=start; s<=end; s=addDays(s,1)){
       const k = kind(s, closed);
+      if(k==="closed" && s>=t) closedLeft++;
       if(k==="weekend" || k==="closed") continue;
       target += DAY; totalDays++;
       const cap = (DAY - credit(s, closed))/DAY; // working days you'll actually be in (holidays = 0, half = 0.5)
@@ -515,7 +517,7 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
       const todayCap = (t>=start && t<=end && kind(t,closed)!=="weekend" && kind(t,closed)!=="closed") ? (DAY - credit(t,closed))/DAY : 0;
       projected = loggedPast + Math.max(loggedFromToday, rate*todayCap) + rate*Math.max(0, capLeft - todayCap);
     }
-    return { start, end, target, totalDays, logged, capLeft, daysLeft, holLeft, projected, rate: capPast ? loggedPast/capPast : null };
+    return { start, end, target, totalDays, logged, capLeft, daysLeft, holLeft, closedLeft, projected, rate: capPast ? loggedPast/capPast : null };
   }
   const tierFor = p => { let t=null; TIERS.forEach(x=>{ if(p>=x.p-1e-9) t=x; }); return t; };
 
@@ -561,6 +563,9 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     $("fqTarget").textContent = fmtMins(f.target);
     $("fqTargetSub").textContent = f.totalDays+" working days × "+HOURS_PER_DAY+"h";
     $("fqLogged").textContent = fmtMins(f.logged);
+    $("fqDays").textContent = String(+f.capLeft.toFixed(1));
+    const dl = []; if(f.holLeft) dl.push(String(+f.holLeft.toFixed(1))+" holiday"); if(f.closedLeft) dl.push(f.closedLeft+" office closed");
+    $("fqDaysSub").textContent = "incl. today"+(dl.length?" · excl. "+dl.join(", "):"");
     $("fqLoggedSub").textContent = pctTxt(pct)+" of the quarter target";
     if(projPct===null){
       $("fqBonus").textContent = "—"; $("fqBonusSub").textContent = "Shows once a working day before today has passed";
@@ -584,7 +589,7 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     const mk = $("fqMark");
     if(projPct!==null){ mk.hidden=false; mk.style.left = Math.min(100, projPct*100)+"%"; } else mk.hidden = true;
     $("fqTicks").innerHTML = TIERS.map(x=>`<div class="tick ${pct>=x.p-1e-9?"hit":""}" style="left:${x.p*100}%"><span>${Math.round(x.p*100)}%</span></div>`).join("");
-    $("fqRange").textContent = fmtShort(f.start)+" – "+fmtShort(f.end)+" · "+f.daysLeft+" working day"+(f.daysLeft===1?"":"s")+" left incl. today";
+    $("fqRange").textContent = fmtShort(f.start)+" – "+fmtShort(f.end)+" · "+(+f.capLeft.toFixed(1))+" working day"+(f.capLeft===1?"":"s")+" left incl. today";
     $("fqRows").innerHTML = TIERS.map(x=>{
       const hours = x.p*f.target, need = Math.max(0, hours - f.logged), hit = need<=0;
       const perDay = f.capLeft ? need/f.capLeft : Infinity;
@@ -596,7 +601,7 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
       return `<tr class="${hit?"hit":""} ${onPace?"next":""}"><td>${Math.round(x.p*100)}%</td><td>${gbp(x.b)}</td><td>${fmtMins(hours)}</td><td>${hit?"—":fmtMins(Math.ceil(need))}</td><td>${pd}</td></tr>`;
     }).join("");
     const bits = ["Quarter target = "+HOURS_PER_DAY+"h × every working day in the quarter (holidays included, office-closed days left out)."];
-    bits.push("“Per day” spreads what's left over the days you'll actually be working"+(f.holLeft?", with "+f.holLeft+" upcoming holiday day"+(f.holLeft===1?"":"s")+" taken out":"")+".");
+    bits.push("“Per day” = what's left to log ÷ your "+(+f.capLeft.toFixed(1))+" working days left (from today, holidays and office-closed days taken out; a half-day holiday counts as half a day).");
     if(f.rate!==null) bits.push("Projection assumes you keep averaging "+fmtMins(f.rate)+" per working day.");
     bits.push("Highlighted row = the tier you're on course for.");
     $("fqNote").textContent = bits.join(" ");
@@ -971,11 +976,10 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
   function openAddTk(t){
     state.tEditing = t ? t.key : null;
     $("tCompany").value = t ? t.company : (state.tCo || ""); $("tTicket").value = t ? t.ticket : ""; $("tTitle").value = t ? (t.title||"") : "";
-    $("tCompany").disabled = $("tTicket").disabled = !!t;
     $("tSave").textContent = t ? "Save" : "Add ticket"; $("tErr").textContent = "";
-    $("addTk").hidden = false; (t ? $("tTitle") : $("tCompany")).focus({preventScroll:true});
+    $("addTk").hidden = false; $("tCompany").focus({preventScroll:true});
   }
-  function closeAddTk(){ $("addTk").hidden = true; state.tEditing = null; $("tCompany").disabled = $("tTicket").disabled = false; }
+  function closeAddTk(){ $("addTk").hidden = true; state.tEditing = null; }
   $("addTkBtn").addEventListener("click", ()=>{ $("addTk").hidden ? openAddTk(null) : closeAddTk(); });
   $("tCancel").addEventListener("click", closeAddTk);
   $("addTk").addEventListener("submit", async ev=>{
@@ -983,8 +987,21 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     if(!tcol){ $("tErr").textContent="Saving isn't available here."; return; }
     if(state.tEditing){
       const t = allTickets().find(x=>x.key===state.tEditing); if(!t){ closeAddTk(); return; }
-      await tcol.doc(t.key).set({ company:t.company, ticket:t.ticket, title:$("tTitle").value.trim(), status:t.status, createdAt:t.createdAt||Date.now(), updatedAt:Date.now() });
-      closeAddTk(); return;
+      const co = $("tCompany").value.trim(), tk = $("tTicket").value.trim();
+      if(!co || !tk){ $("tErr").textContent="Add a company and ticket number."; return; }
+      const nk = tKey(co, tk);
+      if(nk!==t.key && allTickets().some(x=>x.key===nk)){ $("tErr").textContent="That company already has a ticket with this number."; return; }
+      $("tSave").disabled = true;
+      try{
+        // Renaming moves every logged entry for this ticket across, so totals stay together.
+        if(co!==t.company || tk!==t.ticket){ for(const e of t.entries) await col.doc(e.id).update({ company:co, ticket:tk }); }
+        await tcol.doc(nk).set({ company:co, ticket:tk, title:$("tTitle").value.trim(), status:t.status, createdAt:t.createdAt||Date.now(), updatedAt:Date.now() });
+        if(nk!==t.key && t.saved) await tcol.doc(t.key).delete();
+        if(state.tOpen===t.key) state.tOpen = nk;
+        closeAddTk();
+      }catch(_){ $("tErr").textContent="Couldn't save that change. Try again."; }
+      finally{ $("tSave").disabled = false; }
+      return;
     }
     const co = $("tCompany").value.trim(), tk = $("tTicket").value.trim();
     if(!co || !tk){ $("tErr").textContent="Add a company and ticket number."; return; }
