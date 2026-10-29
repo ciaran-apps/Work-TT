@@ -200,6 +200,18 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
 .tk-hrs{font-family:var(--f-mono);font-size:1.35rem;font-weight:500;text-align:right;font-variant-numeric:tabular-nums;line-height:1.1}
 .tk-meta{font-size:.78rem;color:var(--muted);text-align:right;white-space:nowrap}
 .tk-ops{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.tk-est{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:8px 10px;background:var(--bg);border-radius:6px}
+.tk-est .lbl{font-size:.72rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.tk-est .left{font-family:var(--f-mono);font-size:1.15rem;font-weight:500;font-variant-numeric:tabular-nums}
+.tk-est .sub{font-size:.78rem;color:var(--muted)}
+.tk-est.over .left{color:var(--warn)}
+.tk-est .mbar{flex:1 1 100%;height:5px;border-radius:3px;background:var(--line);overflow:hidden;order:9}
+.tk-est .mbar i{display:block;height:100%;background:var(--accent)}
+.tk-est.over .mbar i{background:var(--warn)}
+.tk-est .push{margin-left:auto}
+.estedit{display:grid;gap:8px;padding:10px;background:var(--bg);border:1px solid var(--accent);border-radius:6px}
+.estedit .r{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.estedit input{width:6.5rem;flex:none;background:var(--surface)}
 .tk-id .chip{font-family:var(--f-body);vertical-align:2px;margin-left:4px}
 .chip.open{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
 .chip.shut{background:var(--bg);color:var(--muted);border-color:var(--line)}
@@ -383,6 +395,9 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
       </label>
       <label><span>Title <span class="opt">(optional)</span></span>
         <input id="tTitle" autocomplete="off" placeholder="Short note on what it is">
+      </label>
+      <label id="tEstWrap"><span>Est. hrs left to bill <span class="opt">(optional)</span></span>
+        <input id="tEst" class="mono" autocomplete="off" inputmode="decimal" placeholder="e.g. 4">
       </label>
       <div class="wide actions" style="justify-content:flex-end">
         <p class="err" id="tErr" role="alert" style="margin-right:auto"></p>
@@ -771,10 +786,20 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     Object.entries(state.tickets).forEach(([k,d])=>{
       const t = m[k] ||= { key:k, company:d.company, ticket:d.ticket, title:"", status:"open", minutes:0, entries:[], last:"", createdAt:d.createdAt||0 };
       t.title = d.title||""; t.status = d.status==="closed" ? "closed" : d.status==="hold" ? "hold" : "open"; t.saved = true;
+      t.estLeft = typeof d.estLeft==="number" ? d.estLeft : null; t.estSince = d.estSince||0;
       if(!t.entries.length){ t.company = d.company; t.ticket = d.ticket; }
+    });
+    // Estimate left to bill counts down as time is logged after it was set.
+    Object.values(m).forEach(t=>{
+      if(t.estLeft==null){ t.estRemain = null; return; }
+      t.estUsed = t.entries.filter(e=>(e.createdAt||0) > t.estSince).reduce((a,e)=>a+q15(e.minutes),0);
+      t.estRemain = t.estLeft - t.estUsed;
     });
     return Object.values(m);
   }
+  // The full saved record for a ticket, so a change to one field never drops the others.
+  const tDoc = (t, o={}) => ({ company:t.company, ticket:t.ticket, title:t.title||"", status:t.status||"open",
+    estLeft: t.estLeft==null ? null : t.estLeft, estSince: t.estSince||null, createdAt:t.createdAt||Date.now(), updatedAt:Date.now(), ...o });
   const byRecent = (a,b)=> (b.last||"").localeCompare(a.last||"") || (b.createdAt||0)-(a.createdAt||0);
   function knownCompanies(){
     const seen = new Map();
@@ -818,13 +843,36 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     const del = state.tConfirmDel===t.key
       ? `<span class="confirm">Remove ticket? <button type="button" class="ghost danger" data-tdelok="${esc(t.key)}">Yes</button><button type="button" class="ghost" data-tdelno="1">No</button></span>`
       : (t.saved && !n ? `<button type="button" class="ghost danger" data-tdel="${esc(t.key)}">Remove</button>` : "");
+    let est = "";
+    if(state.tEst===t.key){
+      const cur = t.estRemain!=null ? decHours(Math.max(0,t.estRemain)) : "";
+      est = `<form class="estedit" data-estform="${esc(t.key)}" novalidate>
+        <div class="r"><span class="lbl" style="font-size:.72rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)">Hrs left to bill</span>
+          <input class="mono" name="v" inputmode="decimal" autocomplete="off" value="${esc(cur)}" placeholder="e.g. 4" aria-label="Hours left to bill">
+          ${[0.5,1,2,4,8].map(h=>`<button type="button" class="pick" data-estq="${h}">${h}h</button>`).join("")}</div>
+        <div class="r"><button type="submit" class="small primary">Save</button><button type="button" class="ghost" data-estcancel="1">Cancel</button>
+          ${t.estRemain!=null?`<button type="button" class="ghost danger" data-estclear="${esc(t.key)}">Remove estimate</button>`:""}
+          <span class="err" data-esterr style="margin:0"></span></div>
+      </form>`;
+    } else if(t.status!=="closed"){
+      if(t.estRemain==null) est = `<div class="tk-ops"><button type="button" class="ghost" data-estset="${esc(t.key)}">+ Add hrs left to bill</button></div>`;
+      else {
+        const over = t.estRemain<=0, done = t.estUsed||0, total = t.estLeft||1;
+        est = `<div class="tk-est ${over?"over":""}">
+          <span class="lbl">Left to bill</span><span class="left">${over? (t.estRemain<0?"Over by "+fmtMins(-t.estRemain):"0h") : fmtMins(t.estRemain)}</span>
+          <span class="sub">${fmtMins(t.estLeft)} est. on ${esc(shortDay(iso(new Date(t.estSince))))}${done?` · ${fmtMins(done)} logged since`:""}</span>
+          <button type="button" class="ghost push" data-estset="${esc(t.key)}">Update</button>
+          <span class="mbar" aria-hidden="true"><i style="width:${Math.min(100, done/total*100)}%"></i></span>
+        </div>`;
+      }
+    }
     const moves = t.status==="open" ? [["hold","Put on hold"],["closed","Close"]]
       : t.status==="hold" ? [["open","Reopen"],["closed","Close"]] : [["open","Reopen"]];
     return `<div class="tk-card ${t.status==="open"?"":t.status}">
       <div class="tk-top">
         <div><div class="tk-id">${esc(t.ticket)} <span class="chip ${ST_CHIP[t.status]}">${ST_LABEL[t.status]}</span></div><div class="tk-co">${esc(t.company)}</div>${t.title?`<div class="tk-title">${esc(t.title)}</div>`:""}</div>
         <div><div class="tk-hrs">${fmtMins(t.minutes)}</div><div class="tk-meta">${n?`${n} entr${n===1?"y":"ies"} · last ${esc(shortDay(t.last))}`:"No time yet"}</div></div>
-      </div>
+      </div>${est}
       <div class="tk-ops">
         <button type="button" class="small" data-tlog="${esc(t.key)}">Log time</button>
         ${moves.map(([to,l])=>`<button type="button" class="ghost" data-tstat="${esc(t.key)}" data-to="${to}">${l}</button>`).join("")}
@@ -841,7 +889,11 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     $("tFilterCo").innerHTML = `<option value="">All companies</option>` + cos.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join("");
     $("tFilterCo").value = state.tCo;
     document.querySelectorAll("#tStatusSeg button").forEach(x=>x.setAttribute("aria-pressed", String(x.dataset.tstatus===state.tStatus)));
-    $("tSum").innerHTML = all.length ? `<span><b>${open.length}</b> open</span><span><b>${fmtMins(sumMins(open.flatMap(t=>t.entries)))}</b> on open tickets</span><span><b>${hold.length}</b> on hold</span><span><b>${all.length-open.length-hold.length}</b> closed</span>` : "";
+    const estOf = list => list.reduce((a,t)=>a+(t.estRemain>0?t.estRemain:0),0);
+    const estOpen = estOf(open), estHold = estOf(hold), noEst = open.filter(t=>t.estRemain==null).length;
+    $("tSum").innerHTML = all.length ? `<span><b>${open.length}</b> open</span><span><b>${fmtMins(sumMins(open.flatMap(t=>t.entries)))}</b> on open tickets</span>`
+      + (open.some(t=>t.estRemain!=null) ? `<span><b>${fmtMins(estOpen)}</b> left to bill on open${noEst?` (${noEst} without estimate)`:""}</span>` : "")
+      + (estHold ? `<span><b>${fmtMins(estHold)}</b> left on hold</span>` : "") + `<span><b>${hold.length}</b> on hold</span><span><b>${all.length-open.length-hold.length}</b> closed</span>` : "";
     const rows = tVisible();
     $("tList").innerHTML = rows.length ? rows.map(ticketHtml).join("")
       : all.length ? `<div class="empty"><b>No ${state.tStatus==="all"?"":ST_LABEL[state.tStatus].toLowerCase()+" "}tickets here</b>Try another filter or clear the search.</div>`
@@ -977,6 +1029,7 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     state.tEditing = t ? t.key : null;
     $("tCompany").value = t ? t.company : (state.tCo || ""); $("tTicket").value = t ? t.ticket : ""; $("tTitle").value = t ? (t.title||"") : "";
     $("tSave").textContent = t ? "Save" : "Add ticket"; $("tErr").textContent = "";
+    $("tEst").value = ""; $("tEstWrap").hidden = !!t;
     $("addTk").hidden = false; $("tCompany").focus({preventScroll:true});
   }
   function closeAddTk(){ $("addTk").hidden = true; state.tEditing = null; }
@@ -995,7 +1048,7 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
       try{
         // Renaming moves every logged entry for this ticket across, so totals stay together.
         if(co!==t.company || tk!==t.ticket){ for(const e of t.entries) await col.doc(e.id).update({ company:co, ticket:tk }); }
-        await tcol.doc(nk).set({ company:co, ticket:tk, title:$("tTitle").value.trim(), status:t.status, createdAt:t.createdAt||Date.now(), updatedAt:Date.now() });
+        await tcol.doc(nk).set(tDoc(t, { company:co, ticket:tk, title:$("tTitle").value.trim() }));
         if(nk!==t.key && t.saved) await tcol.doc(t.key).delete();
         if(state.tOpen===t.key) state.tOpen = nk;
         closeAddTk();
@@ -1007,7 +1060,9 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     if(!co || !tk){ $("tErr").textContent="Add a company and ticket number."; return; }
     const k = tKey(co, tk);
     if(allTickets().some(t=>t.key===k)){ $("tErr").textContent="That ticket is already on the list."; return; }
-    await tcol.doc(k).set({ company:co, ticket:tk, title:$("tTitle").value.trim(), status:"open", createdAt:Date.now(), updatedAt:Date.now() });
+    const ev0 = $("tEst").value.trim(), em = ev0 ? parseTime(ev0) : null;
+    if(ev0 && !(em>0)){ $("tErr").textContent="Enter hours left to bill like 0.5, 2 or 4, or leave it blank."; return; }
+    await tcol.doc(k).set({ company:co, ticket:tk, title:$("tTitle").value.trim(), status:"open", estLeft: em ? q15(em) : null, estSince: em ? Date.now() : null, createdAt:Date.now(), updatedAt:Date.now() });
     state.tStatus = state.tStatus==="closed" ? "open" : state.tStatus;
     closeAddTk();
   });
@@ -1015,10 +1070,24 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
   try{ const s=localStorage.getItem("ttt-tstatus"); if(["open","hold","closed","all"].includes(s)) state.tStatus=s; }catch(_){}
   $("tFilterCo").addEventListener("change", e=>{ state.tCo=e.target.value; renderTickets(); });
   $("tSearch").addEventListener("input", e=>{ state.tQ=e.target.value; renderTickets(); });
+  $("tList").addEventListener("submit", async ev=>{
+    const f = ev.target.closest("[data-estform]"); if(!f) return;
+    ev.preventDefault();
+    const t = allTickets().find(x=>x.key===f.dataset.estform); if(!t || !tcol) return;
+    const v = f.querySelector("input").value.trim(), m = v==="" ? 0 : parseTime(v);
+    if(typeof m!=="number" || !(m>=0)){ f.querySelector("[data-esterr]").textContent = "Enter hours like 0.5, 2 or 4."; return; }
+    state.tEst = null;
+    await tcol.doc(t.key).set(tDoc(t, { estLeft: q15(m||0), estSince: Date.now() }));
+  });
   $("tList").addEventListener("click", async ev=>{
     const b = ev.target.closest("button"); if(!b) return;
     const find = k => allTickets().find(t=>t.key===k);
     if(b.dataset.tshow){ state.tOpen = state.tOpen===b.dataset.tshow ? null : b.dataset.tshow; renderTickets(); return; }
+    if(b.dataset.estset){ state.tEst = b.dataset.estset; renderTickets(); const i=document.querySelector(`[data-estform] input`); if(i){ i.focus({preventScroll:true}); i.select(); } return; }
+    if(b.dataset.estcancel){ state.tEst = null; renderTickets(); return; }
+    if(b.dataset.estq){ const i=b.closest("form").querySelector("input"); i.value=b.dataset.estq; i.focus({preventScroll:true}); return; }
+    if(b.dataset.estclear){ const t=find(b.dataset.estclear); if(!t||!tcol) return; state.tEst=null;
+      await tcol.doc(t.key).set(tDoc(t, { estLeft:null, estSince:null })); return; }
     if(b.dataset.tlog){ const t=find(b.dataset.tlog); if(!t) return; if(state.editing) resetForm(false);
       $("fCompany").value=t.company; $("fTicket").value=t.ticket; $("fDate").value=todayIso(); renderDatalists(); renderPicks();
       showTab("log"); $("fTime").focus({preventScroll:true}); return; }
@@ -1027,7 +1096,7 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     if(b.dataset.tdelno){ state.tConfirmDel=null; renderTickets(); return; }
     if(!tcol) return;
     if(b.dataset.tstat){ const t=find(b.dataset.tstat); if(!t) return;
-      await tcol.doc(t.key).set({ company:t.company, ticket:t.ticket, title:t.title||"", status:(["open","hold","closed"].includes(b.dataset.to)?b.dataset.to:"open"), createdAt:t.createdAt||Date.now(), updatedAt:Date.now() }); return; }
+      await tcol.doc(t.key).set(tDoc(t, { status:(["open","hold","closed"].includes(b.dataset.to)?b.dataset.to:"open") })); return; }
     if(b.dataset.tdelok){ const k=b.dataset.tdelok; state.tConfirmDel=null; await tcol.doc(k).delete(); }
   });
 
