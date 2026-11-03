@@ -200,21 +200,17 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
 .tk-hrs{font-family:var(--f-mono);font-size:1.35rem;font-weight:500;text-align:right;font-variant-numeric:tabular-nums;line-height:1.1}
 .tk-meta{font-size:.78rem;color:var(--muted);text-align:right;white-space:nowrap}
 .tk-ops{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
-.tk-est{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:8px 10px;background:var(--bg);border-radius:6px}
-.tk-est .lbl{font-size:.72rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
-.tk-est .left{font-family:var(--f-mono);font-size:1.15rem;font-weight:500;font-variant-numeric:tabular-nums}
-.tk-est .sub{font-size:.78rem;color:var(--muted)}
-.tk-est.over .left{color:var(--warn)}
-.tk-est .mbar{flex:1 1 100%;height:5px;border-radius:3px;background:var(--line);overflow:hidden;order:9}
-.tk-est .mbar i{display:block;height:100%;background:var(--accent)}
-.tk-est.over .mbar i{background:var(--warn)}
-.tk-est .push{margin-left:auto}
-.estedit{display:grid;gap:8px;padding:10px;background:var(--bg);border:1px solid var(--accent);border-radius:6px}
-.estedit .r{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-.estedit input{width:6.5rem;flex:none;background:var(--surface)}
 .tk-id .chip{font-family:var(--f-body);vertical-align:2px;margin-left:4px}
 .chip.open{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
 .chip.shut{background:var(--bg);color:var(--muted);border-color:var(--line)}
+.chip.nbc{background:var(--bg);color:var(--muted);border-color:var(--muted);border-style:dashed}
+.cell .meter i.nb{background:var(--muted);opacity:.55}
+.nbtxt{color:var(--muted)}
+.hint{font-size:.82rem;color:var(--muted);margin:0}
+.mcol .bwrap{width:min(70%,44px);display:flex;flex-direction:column;justify-content:flex-end;height:100%}
+.mcol .bwrap .b{width:100%}
+.mcol .nbseg{width:100%;background:var(--muted);opacity:.45;border-radius:4px 4px 0 0}
+.mcol .nbseg+.b{border-radius:0}
 .chip.hold{background:var(--warn-soft);color:var(--warn);border-color:var(--warn)}
 .tk-card.hold{border-left-color:var(--warn)}
 .tk-ents{display:grid;border-top:1px solid var(--line)}
@@ -327,6 +323,7 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
       <span><i class="sw" style="background:var(--ok-mid)"></i>3.75h or more</span>
       <span><i class="sw" style="background:var(--warn)"></i>Under 3.75h</span>
       <span><i class="sw" style="background:var(--hol)"></i>Holiday (still in target)</span>
+      <span><i class="sw" style="background:var(--muted);opacity:.55"></i>Non-billable (n/b)</span>
       <span><i class="dot"></i>Not all on X-Suite</span>
       <span>Striped = office closed</span>
     </div>
@@ -337,10 +334,11 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     <div class="phead">
       <h2 id="moTitle">Hours by month</h2>
     </div>
+    <p class="hint" id="mKey" hidden>Teal = billable · grey = non-billable. Figures above each bar are billable hours.</p>
     <div class="mchart" id="mchart"></div>
     <div class="tablewrap">
       <table>
-        <thead><tr><th>Month</th><th>Hours</th></tr></thead>
+        <thead><tr id="mHead"><th>Month</th><th>Hours</th></tr></thead>
         <tbody id="mRows"></tbody>
       </table>
     </div>
@@ -371,7 +369,11 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
       <label class="c2">On X-Suite
         <span class="toggle"><input type="checkbox" id="fXsuite"> Logged on X-Suite</span>
       </label>
-      <div class="c4 actions" style="justify-content:flex-end">
+      <label class="c2">Billing
+        <span class="toggle"><input type="checkbox" id="fNB"> Non-billable ticket</span>
+      </label>
+      <p class="hint c6" id="fNbHint" hidden>Non-billable: this time is recorded against the ticket but doesn't count towards your bonus or daily target.</p>
+      <div class="c6 actions" style="justify-content:flex-end">
         <p class="err" id="formErr" role="alert" style="margin-right:auto"></p>
         <button type="button" id="cancelEdit" hidden>Cancel</button>
         <button type="submit" class="primary" id="saveBtn">Add entry</button>
@@ -396,8 +398,8 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
       <label><span>Title <span class="opt">(optional)</span></span>
         <input id="tTitle" autocomplete="off" placeholder="Short note on what it is">
       </label>
-      <label id="tEstWrap"><span>Est. hrs left to bill <span class="opt">(optional)</span></span>
-        <input id="tEst" class="mono" autocomplete="off" inputmode="decimal" placeholder="e.g. 4">
+      <label class="wide" style="text-transform:none;letter-spacing:0">
+        <span class="toggle"><input type="checkbox" id="tNB"> Non-billable — track time only, not counted towards bonus</span>
       </label>
       <div class="wide actions" style="justify-content:flex-end">
         <p class="err" id="tErr" role="alert" style="margin-right:auto"></p>
@@ -492,11 +494,17 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
   const esc = s => String(s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const sumMins = arr => arr.reduce((s,e)=>s+q15(e.minutes),0);
   const byDate = () => { const m={}; state.entries.forEach(e=>{ (m[e.date] ||= []).push(e); }); return m; };
+  // Non-billable tickets: time is recorded but never counts towards the bonus or daily/weekly targets.
+  const nbSet = () => { const s=new Set(); Object.entries(state.tickets||{}).forEach(([k,d])=>{ if(d && d.nonBill) s.add(k); }); return s; };
+  const entKey = e => encodeURIComponent(String(e.company||"").trim().toLowerCase()+"|"+String(e.ticket||"").trim().toLowerCase());
+  const billOnly = (arr, nb=nbSet()) => arr.filter(e=>!nb.has(entKey(e)));
+  const nbOnly = (arr, nb=nbSet()) => arr.filter(e=>nb.has(entKey(e)));
+  const byDateBill = () => { const nb=nbSet(), m={}; state.entries.forEach(e=>{ if(!nb.has(entKey(e))) (m[e.date] ||= []).push(e); }); return m; };
   const pctTxt = p => (Math.floor(p*1000)/10).toFixed(1).replace(/\.0$/,"")+"%";
 
   // ---- bonus maths ----
   function quarterStats(){
-    const { start, end } = quarterBounds(), t = todayIso(), closed = closedSet(), days = byDate();
+    const { start, end } = quarterBounds(), t = todayIso(), closed = closedSet(), days = byDateBill();
     // Target runs from the quarter start up to and including today (or the quarter end, once it's over)
     const upTo = t < end ? t : end;
     let available=0, days_=0, closedCount=0, holDays=0;
@@ -507,13 +515,13 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
       available += DAY; days_++;
       const c = credit(s, closed); if(c) holDays += c/DAY; // holidays stay in the target but add no hours
     }
-    const logged = sumMins(state.entries.filter(e=>e.date>=start && e.date<=upTo));
+    const logged = sumMins(billOnly(state.entries.filter(e=>e.date>=start && e.date<=upTo)));
     const pct = available ? logged/available : 0;
     return { start, end, upTo, available, days: days_, achieved: logged, holDays, closedCount, pct };
   }
   // Full quarter: target over every working day, and what the rest of the quarter needs
   function fullQuarterStats(){
-    const { start, end } = quarterBounds(), t = todayIso(), closed = closedSet(), days = byDate();
+    const { start, end } = quarterBounds(), t = todayIso(), closed = closedSet(), days = byDateBill();
     let target=0, totalDays=0, capPast=0, loggedPast=0, capLeft=0, daysLeft=0, holLeft=0, closedLeft=0;
     for(let s=start; s<=end; s=addDays(s,1)){
       const k = kind(s, closed);
@@ -524,7 +532,7 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
       if(s < t){ capPast += cap; loggedPast += sumMins(days[s]||[]); }
       else { capLeft += cap; daysLeft++; if(cap<1) holLeft += 1-cap; }
     }
-    const logged = sumMins(state.entries.filter(e=>e.date>=start && e.date<=end));
+    const logged = sumMins(billOnly(state.entries.filter(e=>e.date>=start && e.date<=end)));
     const loggedFromToday = logged - loggedPast;
     let projected = null;
     if(capPast > 0){
@@ -567,6 +575,8 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     if(q.closedCount) bits.push(q.closedCount+" office-closed day"+(q.closedCount===1?"":"s")+" left out");
     if(q.holDays) bits.push(q.holDays+" holiday day"+(q.holDays===1?"":"s")+" included with no hours");
     renderFullQuarter();
+    const qNB = sumMins(nbOnly(state.entries.filter(e=>e.date>=q.start && e.date<=q.upTo)));
+    if(qNB) bits.push(fmtMins(qNB)+" on non-billable tickets not counted");
     $("bNote").textContent = "Target so far = "+HOURS_PER_DAY+"h × each working day from "+fmtShort(q.start)+" to today, including today. It grows by "+HOURS_PER_DAY+"h each working day. "+(bits.length? bits.join(" · ")+".":"");
   }
 
@@ -624,7 +634,7 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
 
   // ---- calendar ----
   function renderCal(){
-    const y=state.calY, m=state.calM, first=new Date(y,m,1), t=todayIso(), closed=closedSet(), days=byDate();
+    const y=state.calY, m=state.calM, first=new Date(y,m,1), t=todayIso(), closed=closedSet(), days=byDate(), nb=nbSet();
     $("calMonth").textContent = first.toLocaleDateString(undefined,{month:"long",year:"numeric"});
     const startD = new Date(y,m,1-((first.getDay()+6)%7));
     const lastD = new Date(y,m+1,0);
@@ -634,7 +644,7 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
       const wk = [0,1,2,3,4].map(i=>{ const x=new Date(w); x.setDate(w.getDate()+i); return x; });
       if(!wk.some(x=>x.getMonth()===m)) continue; // skip a row whose weekdays all fall in another month
       for(const d of wk){
-      const s=iso(d), items=days[s]||[], logged=sumMins(items), k=kind(s,closed), c=credit(s,closed), total=logged+c; // total vs DAY = this day's own work quota met
+      const s=iso(d), items=days[s]||[], logged=sumMins(billOnly(items,nb)), nbm=sumMins(items)-logged, k=kind(s,closed), c=credit(s,closed), total=logged+c; // billable hours drive the bar; non-billable shows in grey
       const cls=["cell"];
       if(d.getMonth()!==m) cls.push("out");
       if(k==="weekend") cls.push("wkend");
@@ -644,28 +654,29 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
       // Bar colour: amber under half a day, light green from half a day (3.75h), full green at a full day (7.5h)
       const quota = (k==="weekend"||k==="closed") ? DAY : (DAY - c);
       const band = logged<=0 ? "" : logged>=quota ? "met" : logged>=quota/2 ? "halfmet" : logged>0 ? "part" : "";
-      if(band) cls.push(band); else if(k==="work" && s<t) cls.push("miss");
+      if(band) cls.push(band); else if(k==="work" && s<t && !nbm) cls.push("miss");
       const pending = items.some(e=>!e.onXsuite);
       let hrs = "";
       if(k==="holiday") hrs = `<span class="tag">Holiday</span>`;
       else if(k==="half") hrs = logged ? fmtMins(logged) : `<span class="tag">½ Holiday</span>`;
       else if(k==="closed") hrs = logged ? fmtMins(logged) : `<span class="tag">Closed</span>`;
       else if(logged) hrs = fmtMins(logged);
+      else if(nbm) hrs = `<span class="nbtxt">${fmtMins(nbm)}</span>`;
       else if(k==="work" && s<t) hrs = "0h";
       const wH = Math.min(100, c/DAY*100), wW = Math.min(100-wH, logged/DAY*100);
-      html += `<button type="button" class="${cls.join(" ")}" data-day="${s}" aria-label="${esc(fmtDay(s))}, ${logged?fmtMins(logged):"nothing"} logged${k==="closed"?", office closed":k==="holiday"?", holiday":k==="half"?", half-day holiday":""}">
+      html += `<button type="button" class="${cls.join(" ")}" data-day="${s}" aria-label="${esc(fmtDay(s))}, ${logged?fmtMins(logged):"nothing"} logged${nbm?", plus "+fmtMins(nbm)+" non-billable":""}${k==="closed"?", office closed":k==="holiday"?", holiday":k==="half"?", half-day holiday":""}">
         <span class="dn"><span>${d.getDate()}</span>${pending?'<i class="dot"></i>':""}</span>
         <span class="hrs">${hrs}</span>
-        <span class="meter">${wW?`<i class="w" style="width:${Math.min(100,logged/((DAY-c)||DAY)*100)}%"></i>`:""}</span>
+        <span class="meter">${wW?`<i class="w" style="width:${Math.min(100,logged/((DAY-c)||DAY)*100)}%"></i>`:""}${nbm?`<i class="nb" style="width:${Math.max(4,Math.min(100-Math.min(100,logged/((DAY-c)||DAY)*100), nbm/((DAY-c)||DAY)*100))}%"></i>`:""}</span>
       </button>`;
       }
       // Weekly total: all hours logged Mon–Sun
-      let wLogged=0, wTarget=0, wEnd=0;
-      for(let i=0;i<7;i++){ const x=new Date(w); x.setDate(w.getDate()+i); const s=iso(x), k=kind(s,closed), l=sumMins(days[s]||[]);
-        wLogged+=l; if(i>4) wEnd+=l; if(k!=="weekend" && k!=="closed") wTarget+=DAY; }
-      html += `<div class="cell wk" role="group" aria-label="Week of ${esc(fmtShort(iso(w)))}: ${fmtMins(wLogged)} logged">
+      let wLogged=0, wTarget=0, wEnd=0, wNB=0;
+      for(let i=0;i<7;i++){ const x=new Date(w); x.setDate(w.getDate()+i); const s=iso(x), k=kind(s,closed), all=days[s]||[], l=sumMins(billOnly(all,nb));
+        wLogged+=l; wNB+=sumMins(all)-l; if(i>4) wEnd+=l; if(k!=="weekend" && k!=="closed") wTarget+=DAY; }
+      html += `<div class="cell wk" role="group" aria-label="Week of ${esc(fmtShort(iso(w)))}: ${fmtMins(wLogged)} billable${wNB?", "+fmtMins(wNB)+" non-billable":""}">
         <span class="dn">Total</span>
-        <span><span class="hrs">${wLogged || iso(w)<=t ? fmtMins(wLogged) : ""}</span>${wEnd?`<span class="of" style="display:block" title="Includes ${fmtMins(wEnd)} logged on Sat/Sun">+${fmtMins(wEnd)} w/e</span>`:""}</span>
+        <span><span class="hrs">${wLogged || iso(w)<=t ? fmtMins(wLogged) : ""}</span>${wEnd?`<span class="of" style="display:block" title="Includes ${fmtMins(wEnd)} logged on Sat/Sun">+${fmtMins(wEnd)} w/e</span>`:""}${wNB?`<span class="of" style="display:block" title="${fmtMins(wNB)} on non-billable tickets, not in the total">+${fmtMins(wNB)} n/b</span>`:""}</span>
       </div>`;
     }
     $("cal").innerHTML = html;
@@ -673,38 +684,40 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
   }
   // ---- hours by month ----
   function renderMonthly(){
-    const closed=closedSet(), t=todayIso(), days=byDate(), q=quarterBounds();
+    const closed=closedSet(), t=todayIso(), days=byDate(), q=quarterBounds(), nb=nbSet();
     const first = state.entries.reduce((a,e)=> e.date && e.date<a ? e.date : a, q.start);
     let y=+first.slice(0,4), mo=+first.slice(5,7)-1;
     const endY=+q.end.slice(0,4), endM=+q.end.slice(5,7)-1;
     const months=[];
     while(y<endY || (y===endY && mo<=endM)){
       const ms=iso(new Date(y,mo,1)), me=iso(new Date(y,mo+1,0));
-      let logged=0, target=0;
-      for(let s=ms; s<=me; s=addDays(s,1)){ logged+=sumMins(days[s]||[]); const k=kind(s,closed); if(k!=="weekend"&&k!=="closed") target+=DAY; }
-      months.push({ ms, me, logged, target, label:new Date(y,mo,1).toLocaleDateString(undefined,{month:"short"}), full:new Date(y,mo,1).toLocaleDateString(undefined,{month:"long",year:"numeric"}), future: ms>t, cur: ms<=t && t<=me });
+      let logged=0, nbm=0, target=0;
+      for(let s=ms; s<=me; s=addDays(s,1)){ const all=days[s]||[], l=sumMins(billOnly(all,nb)); logged+=l; nbm+=sumMins(all)-l; const k=kind(s,closed); if(k!=="weekend"&&k!=="closed") target+=DAY; }
+      months.push({ ms, me, logged, nbm, target, label:new Date(y,mo,1).toLocaleDateString(undefined,{month:"short"}), full:new Date(y,mo,1).toLocaleDateString(undefined,{month:"long",year:"numeric"}), future: ms>t, cur: ms<=t && t<=me });
       mo++; if(mo>11){ mo=0; y++; }
     }
     const shown = months.slice(-12);
-    const max = Math.max(1, ...shown.map(x=>x.logged));
+    const max = Math.max(1, ...shown.map(x=>x.logged+x.nbm)), anyNB = shown.some(x=>x.nbm);
     $("mchart").innerHTML = shown.map(x=>{
-      const bh = x.logged/max*100, top = bh;
-      const tip = `${x.full}: ${fmtMins(x.logged)} logged`;
+      const bh = x.logged/max*100, nh = x.nbm/max*100, top = bh+nh;
+      const tip = `${x.full}: ${fmtMins(x.logged)} billable${x.nbm?" + "+fmtMins(x.nbm)+" non-billable":""}`;
       return `<div class="mcol ${x.future?"future":""}" tabindex="0" title="${esc(tip)}" aria-label="${esc(tip)}">
-        <div class="b" style="height:${bh}%"></div>
+        <div class="bwrap">${x.nbm?`<div class="nbseg" style="height:${nh}%"></div>`:""}<div class="b" style="height:${bh}%"></div></div>
         <div class="vl" style="bottom:calc(${top}% + 4px)">${x.logged?fmtMins(x.logged):""}</div>
       </div>`;
     }).join("") ;
     let lab = document.getElementById("mlabels");
     if(!lab){ lab=document.createElement("div"); lab.id="mlabels"; lab.className="mlabels"; $("mchart").after(lab); }
     lab.innerHTML = shown.map(x=>`<span class="${x.cur?"cur":""}">${esc(x.label)}</span>`).join("");
-    $("mRows").innerHTML = shown.slice().reverse().map(x=>`<tr class="${x.cur?"next":""}"><td>${esc(x.full)}</td><td>${fmtMins(x.logged)}</td></tr>`).join("");
+    $("mHead").innerHTML = anyNB ? "<th>Month</th><th>Billable</th><th>Non-billable</th>" : "<th>Month</th><th>Hours</th>";
+    $("mRows").innerHTML = shown.slice().reverse().map(x=>`<tr class="${x.cur?"next":""}"><td>${esc(x.full)}</td><td>${fmtMins(x.logged)}</td>${anyNB?`<td>${fmtMins(x.nbm)}</td>`:""}</tr>`).join("");
+    $("mKey").hidden = !anyNB;
   }
   function renderDay(){
     const s = state.sel, box=$("dayview");
     if(!s){ box.innerHTML = `<p class="muted" style="margin:0">Tap a date to see its entries.</p>`; return; }
     const closed=closedSet(), items = (byDate()[s]||[]).slice().sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
-    const logged = sumMins(items), k=kind(s,closed), c=credit(s,closed), total=logged+c;
+    const logged = sumMins(billOnly(items)), nbm = sumMins(items)-logged, k=kind(s,closed), c=credit(s,closed), total=logged+c;
     let status;
     if(k==="weekend") status = `<span class="pill neutral">Weekend${logged?" · "+fmtMins(logged)+" logged":""}</span>`;
     else if(k==="closed") status = `<span class="pill neutral">Office closed · not in target${logged?" · "+fmtMins(logged)+" logged":""}</span>`;
@@ -712,7 +725,8 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     else if(total>=DAY) status = `<span class="pill ok">${fmtMins(logged)} of ${fmtMins(DAY-c)}${c?" (½ holiday)":""}</span>`;
     else status = `<span class="pill ${s<todayIso()?"behind":"neutral"}">${fmtMins(logged)} of ${fmtMins(DAY-c)}${c?" (½ holiday)":""} · ${fmtMins(DAY-total)} short</span>`;
     const opts = [["work","Working day"],["holiday","Holiday"],["half","Half-day holiday"],["closed","Office closed"]];
-    box.innerHTML = `<div class="dh"><b>${esc(fmtDay(s))}</b>${status}</div>
+    if(nbm) status += ` <span class="pill neutral">+ ${fmtMins(nbm)} non-billable</span>`;
+    box.innerHTML = `<div class="dh"><b>${esc(fmtDay(s))}</b><span>${status}</span></div>
       ${k==="weekend" ? "" : `<div class="dayrow"><div class="seg" role="group" aria-label="Day type">${opts.map(([v,l])=>`<button type="button" data-daykind="${v}" data-date="${s}" aria-pressed="${k===v}">${l}</button>`).join("")}</div></div>`}
       <div class="dayrow"><button type="button" class="small primary" data-logday="${s}">Log time on this day</button></div>
       ${items.length ? items.map(rowHtml).join("") : `<div class="empty"><b>No entries</b>Nothing logged for this date yet.</div>`}`;
@@ -737,7 +751,7 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     return `<div class="row">
       <span class="co" title="${esc(e.company)}">${esc(e.company)}</span>
       <span class="tk" title="${esc(e.ticket)}">${esc(e.ticket)}</span>
-      <span class="ds">${esc(e.description)||'<span class="muted">No description</span>'}</span>
+      <span class="ds">${nbSet().has(entKey(e))?'<span class="chip nbc">Non-billable</span> ':""}${esc(e.description)||'<span class="muted">No description</span>'}</span>
       <span class="tm">${fmtMins(e.minutes)}</span>
       <button type="button" class="chip ${e.onXsuite?"yes":"no"}" data-x="${esc(e.id)}" title="Tap to change">${e.onXsuite?"On X-Suite":"Not on X-Suite"}</button>
       <span class="ops">${state.confirmDel===e.id
@@ -753,7 +767,8 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
   }
   function renderLedger(){
     const rows = visible(), total = sumMins(rows), pend = rows.filter(e=>!e.onXsuite);
-    $("ledgerSum").textContent = rows.length ? `${fmtMins(total)} across ${rows.length} entr${rows.length===1?"y":"ies"} · ${fmtMins(sumMins(pend))} not yet on X-Suite` : "";
+    const nbTot = sumMins(nbOnly(rows));
+    $("ledgerSum").textContent = rows.length ? `${fmtMins(total)} across ${rows.length} entr${rows.length===1?"y":"ies"}${nbTot?` (${fmtMins(nbTot)} non-billable)`:""} · ${fmtMins(sumMins(pend))} not yet on X-Suite` : "";
     const by = {}; rows.forEach(e=>{ by[e.company]=(by[e.company]||0)+q15(e.minutes); });
     const list = Object.entries(by).sort((a,b)=>b[1]-a[1]), max = list.length ? list[0][1] : 1;
     $("bars").innerHTML = list.map(([c,m])=>`<div class="bar"><span class="n" title="${esc(c)}">${esc(c)}</span><span class="t"><i style="width:${Math.max(2,m/max*100)}%"></i></span><span class="h">${fmtMins(m)}</span></div>`).join("");
@@ -785,21 +800,14 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     });
     Object.entries(state.tickets).forEach(([k,d])=>{
       const t = m[k] ||= { key:k, company:d.company, ticket:d.ticket, title:"", status:"open", minutes:0, entries:[], last:"", createdAt:d.createdAt||0 };
-      t.title = d.title||""; t.status = d.status==="closed" ? "closed" : d.status==="hold" ? "hold" : "open"; t.saved = true;
-      t.estLeft = typeof d.estLeft==="number" ? d.estLeft : null; t.estSince = d.estSince||0;
+      t.title = d.title||""; t.status = d.status==="closed" ? "closed" : d.status==="hold" ? "hold" : "open"; t.saved = true; t.nonBill = !!d.nonBill;
       if(!t.entries.length){ t.company = d.company; t.ticket = d.ticket; }
-    });
-    // Estimate left to bill counts down as time is logged after it was set.
-    Object.values(m).forEach(t=>{
-      if(t.estLeft==null){ t.estRemain = null; return; }
-      t.estUsed = t.entries.filter(e=>(e.createdAt||0) > t.estSince).reduce((a,e)=>a+q15(e.minutes),0);
-      t.estRemain = t.estLeft - t.estUsed;
     });
     return Object.values(m);
   }
-  // The full saved record for a ticket, so a change to one field never drops the others.
-  const tDoc = (t, o={}) => ({ company:t.company, ticket:t.ticket, title:t.title||"", status:t.status||"open",
-    estLeft: t.estLeft==null ? null : t.estLeft, estSince: t.estSince||null, createdAt:t.createdAt||Date.now(), updatedAt:Date.now(), ...o });
+  // The full saved record for a ticket, so changing one field never drops another.
+  const tDoc = (t, o={}) => ({ company:t.company, ticket:t.ticket, title:t.title||"", status:t.status||"open", nonBill:!!t.nonBill,
+    createdAt:t.createdAt||Date.now(), updatedAt:Date.now(), ...o });
   const byRecent = (a,b)=> (b.last||"").localeCompare(a.last||"") || (b.createdAt||0)-(a.createdAt||0);
   function knownCompanies(){
     const seen = new Map();
@@ -819,7 +827,7 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     const forCo = co ? open.filter(t=>norm(t.company)===co) : open;
     const tks = forCo.slice(0,8), cos = knownCompanies().slice(0,6);
     $("tkPicks").innerHTML = tks.length ? `<span class="k">Open tickets</span>` + tks.map(t=>
-      `<button type="button" class="pick" data-pickt="${esc(t.key)}" aria-pressed="${norm(t.ticket)===tk && norm(t.company)===norm($("fCompany").value)}"><b>${esc(t.ticket)}</b>${co?"":" · "+esc(t.company)}</button>`).join("") : "";
+      `<button type="button" class="pick" data-pickt="${esc(t.key)}" aria-pressed="${norm(t.ticket)===tk && norm(t.company)===norm($("fCompany").value)}"><b>${esc(t.ticket)}</b>${co?"":" · "+esc(t.company)}${t.nonBill?' <span class="nbtxt">· non-bill</span>':""}</button>`).join("") : "";
     $("coPicks").innerHTML = cos.length ? `<span class="k">Companies</span>` + cos.map(c=>
       `<button type="button" class="pick" data-pickc="${esc(c)}" aria-pressed="${norm(c)===co}">${esc(c)}</button>`).join("") : "";
     $("picks").hidden = !(tks.length || cos.length);
@@ -843,36 +851,13 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     const del = state.tConfirmDel===t.key
       ? `<span class="confirm">Remove ticket? <button type="button" class="ghost danger" data-tdelok="${esc(t.key)}">Yes</button><button type="button" class="ghost" data-tdelno="1">No</button></span>`
       : (t.saved && !n ? `<button type="button" class="ghost danger" data-tdel="${esc(t.key)}">Remove</button>` : "");
-    let est = "";
-    if(state.tEst===t.key){
-      const cur = t.estRemain!=null ? decHours(Math.max(0,t.estRemain)) : "";
-      est = `<form class="estedit" data-estform="${esc(t.key)}" novalidate>
-        <div class="r"><span class="lbl" style="font-size:.72rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)">Hrs left to bill</span>
-          <input class="mono" name="v" inputmode="decimal" autocomplete="off" value="${esc(cur)}" placeholder="e.g. 4" aria-label="Hours left to bill">
-          ${[0.5,1,2,4,8].map(h=>`<button type="button" class="pick" data-estq="${h}">${h}h</button>`).join("")}</div>
-        <div class="r"><button type="submit" class="small primary">Save</button><button type="button" class="ghost" data-estcancel="1">Cancel</button>
-          ${t.estRemain!=null?`<button type="button" class="ghost danger" data-estclear="${esc(t.key)}">Remove estimate</button>`:""}
-          <span class="err" data-esterr style="margin:0"></span></div>
-      </form>`;
-    } else if(t.status!=="closed"){
-      if(t.estRemain==null) est = `<div class="tk-ops"><button type="button" class="ghost" data-estset="${esc(t.key)}">+ Add hrs left to bill</button></div>`;
-      else {
-        const over = t.estRemain<=0, done = t.estUsed||0, total = t.estLeft||1;
-        est = `<div class="tk-est ${over?"over":""}">
-          <span class="lbl">Left to bill</span><span class="left">${over? (t.estRemain<0?"Over by "+fmtMins(-t.estRemain):"0h") : fmtMins(t.estRemain)}</span>
-          <span class="sub">${fmtMins(t.estLeft)} est. on ${esc(shortDay(iso(new Date(t.estSince))))}${done?` · ${fmtMins(done)} logged since`:""}</span>
-          <button type="button" class="ghost push" data-estset="${esc(t.key)}">Update</button>
-          <span class="mbar" aria-hidden="true"><i style="width:${Math.min(100, done/total*100)}%"></i></span>
-        </div>`;
-      }
-    }
     const moves = t.status==="open" ? [["hold","Put on hold"],["closed","Close"]]
       : t.status==="hold" ? [["open","Reopen"],["closed","Close"]] : [["open","Reopen"]];
     return `<div class="tk-card ${t.status==="open"?"":t.status}">
       <div class="tk-top">
-        <div><div class="tk-id">${esc(t.ticket)} <span class="chip ${ST_CHIP[t.status]}">${ST_LABEL[t.status]}</span></div><div class="tk-co">${esc(t.company)}</div>${t.title?`<div class="tk-title">${esc(t.title)}</div>`:""}</div>
+        <div><div class="tk-id">${esc(t.ticket)} <span class="chip ${ST_CHIP[t.status]}">${ST_LABEL[t.status]}</span>${t.nonBill?' <span class="chip nbc">Non-billable</span>':""}</div><div class="tk-co">${esc(t.company)}</div>${t.title?`<div class="tk-title">${esc(t.title)}</div>`:""}</div>
         <div><div class="tk-hrs">${fmtMins(t.minutes)}</div><div class="tk-meta">${n?`${n} entr${n===1?"y":"ies"} · last ${esc(shortDay(t.last))}`:"No time yet"}</div></div>
-      </div>${est}
+      </div>
       <div class="tk-ops">
         <button type="button" class="small" data-tlog="${esc(t.key)}">Log time</button>
         ${moves.map(([to,l])=>`<button type="button" class="ghost" data-tstat="${esc(t.key)}" data-to="${to}">${l}</button>`).join("")}
@@ -889,11 +874,8 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     $("tFilterCo").innerHTML = `<option value="">All companies</option>` + cos.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join("");
     $("tFilterCo").value = state.tCo;
     document.querySelectorAll("#tStatusSeg button").forEach(x=>x.setAttribute("aria-pressed", String(x.dataset.tstatus===state.tStatus)));
-    const estOf = list => list.reduce((a,t)=>a+(t.estRemain>0?t.estRemain:0),0);
-    const estOpen = estOf(open), estHold = estOf(hold), noEst = open.filter(t=>t.estRemain==null).length;
-    $("tSum").innerHTML = all.length ? `<span><b>${open.length}</b> open</span><span><b>${fmtMins(sumMins(open.flatMap(t=>t.entries)))}</b> on open tickets</span>`
-      + (open.some(t=>t.estRemain!=null) ? `<span><b>${fmtMins(estOpen)}</b> left to bill on open${noEst?` (${noEst} without estimate)`:""}</span>` : "")
-      + (estHold ? `<span><b>${fmtMins(estHold)}</b> left on hold</span>` : "") + `<span><b>${hold.length}</b> on hold</span><span><b>${all.length-open.length-hold.length}</b> closed</span>` : "";
+    const nbAll = all.filter(t=>t.nonBill), nbHrs = sumMins(nbAll.flatMap(t=>t.entries));
+    $("tSum").innerHTML = all.length ? `<span><b>${open.length}</b> open</span><span><b>${fmtMins(sumMins(billOnly(open.flatMap(t=>t.entries))))}</b> billable on open tickets</span>${nbAll.length?`<span><b>${fmtMins(nbHrs)}</b> on ${nbAll.length} non-billable ticket${nbAll.length===1?"":"s"}</span>`:""}<span><b>${hold.length}</b> on hold</span><span><b>${all.length-open.length-hold.length}</b> closed</span>` : "";
     const rows = tVisible();
     $("tList").innerHTML = rows.length ? rows.map(ticketHtml).join("")
       : all.length ? `<div class="empty"><b>No ${state.tStatus==="all"?"":ST_LABEL[state.tStatus].toLowerCase()+" "}tickets here</b>Try another filter or clear the search.</div>`
@@ -919,27 +901,34 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
   }
 
   // ---- form ----
+  // Tick "Non-billable" automatically when the chosen ticket is already non-billable.
+  function syncNB(){
+    const k = tKey($("fCompany").value, $("fTicket").value);
+    $("fNB").checked = !!(state.tickets[k] && state.tickets[k].nonBill);
+    $("fNbHint").hidden = !$("fNB").checked;
+  }
   function resetForm(keep){
     const company=$("fCompany").value, date=$("fDate").value;
     $("entryForm").reset();
     if(keep){ $("fDate").value=date; } else $("fDate").value = state.sel || todayIso();
     state.editing=null; $("formTitle").textContent="Log time"; $("saveBtn").textContent="Add entry"; $("cancelEdit").hidden=true; $("formErr").textContent="";
     if(keep) $("fCompany").value=company;
-    renderDatalists(); renderPicks();
+    renderDatalists(); renderPicks(); syncNB();
   }
+  $("fNB").addEventListener("change", ()=>{ $("fNbHint").hidden = !$("fNB").checked; });
   $("fDate").value = todayIso();
-  $("fCompany").addEventListener("input", ()=>{ renderDatalists(); renderPicks(); });
+  $("fCompany").addEventListener("input", ()=>{ renderDatalists(); renderPicks(); syncNB(); });
   $("fTicket").addEventListener("input", ()=>{
     // Picking a known ticket fills in its company.
     const tk = norm($("fTicket").value), co = norm($("fCompany").value);
     if(tk){ const hits = allTickets().filter(t=>norm(t.ticket)===tk && (!co || norm(t.company)===co));
       if(hits.length===1 && !co){ $("fCompany").value = hits[0].company; renderDatalists(); } }
-    renderPicks();
+    renderPicks(); syncNB();
   });
   $("picks").addEventListener("click", ev=>{
     const b = ev.target.closest("button"); if(!b) return;
     if(b.dataset.pickc!==undefined){ $("fCompany").value = b.dataset.pickc; if(norm($("fTicket").value) && !allTickets().some(t=>norm(t.company)===norm(b.dataset.pickc) && norm(t.ticket)===norm($("fTicket").value))) $("fTicket").value=""; renderDatalists(); renderPicks(); $("fTicket").focus({preventScroll:true}); }
-    if(b.dataset.pickt){ const t = allTickets().find(x=>x.key===b.dataset.pickt); if(t){ $("fCompany").value=t.company; $("fTicket").value=t.ticket; renderDatalists(); renderPicks(); $("fTime").focus({preventScroll:true}); } }
+    if(b.dataset.pickt){ const t = allTickets().find(x=>x.key===b.dataset.pickt); if(t){ $("fCompany").value=t.company; $("fTicket").value=t.ticket; renderDatalists(); renderPicks(); syncNB(); $("fTime").focus({preventScroll:true}); } }
   });
   $("entryForm").addEventListener("submit", async ev=>{
     ev.preventDefault();
@@ -955,8 +944,17 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     const data = { company, ticket, description:$("fDesc").value.trim(), date, minutes, onXsuite:$("fXsuite").checked };
     $("saveBtn").disabled=true;
     try{
-      if(state.editing){ const prev=state.entries.find(e=>e.id===state.editing); await col.doc(state.editing).set({ ...data, createdAt: prev?.createdAt||Date.now() }); resetForm(false); if(state.returnTab){ showTab(state.returnTab); state.returnTab=null; return; } }
-      else { await col.add({ ...data, createdAt: Date.now() }); resetForm(true); }
+      const wantNB = $("fNB").checked, k = tKey(company, ticket), curNB = !!(state.tickets[k] && state.tickets[k].nonBill);
+      const wasEditing = state.editing;
+      if(wasEditing){ const prev=state.entries.find(e=>e.id===wasEditing); await col.doc(wasEditing).set({ ...data, createdAt: prev?.createdAt||Date.now() }); }
+      else await col.add({ ...data, createdAt: Date.now() });
+      // The billing flag belongs to the ticket: save it there if it changed.
+      if(tcol && wantNB!==curNB){
+        const t = allTickets().find(x=>x.key===k) || { company, ticket, status:"open" };
+        await tcol.doc(k).set(tDoc(t, { nonBill: wantNB }));
+      }
+      if(wasEditing){ resetForm(false); if(state.returnTab){ showTab(state.returnTab); state.returnTab=null; return; } }
+      else resetForm(true);
       $("fTicket").focus();
     }catch(e){ $("formErr").textContent = e && e.code==="quota_exceeded" ? "Storage is full. Delete some old entries and try again." : "Couldn't save that entry. Try again in a moment."; }
     finally{ $("saveBtn").disabled=false; }
@@ -1013,7 +1011,7 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
       const e=state.entries.find(x=>x.id===b.dataset.edit); if(!e) return;
       state.editing=e.id;
       $("fCompany").value=e.company; $("fTicket").value=e.ticket; $("fDesc").value=e.description||"";
-      $("fDate").value=e.date; $("fTime").value=decHours(e.minutes); $("fXsuite").checked=!!e.onXsuite;
+      $("fDate").value=e.date; $("fTime").value=decHours(e.minutes); $("fXsuite").checked=!!e.onXsuite; syncNB();
       $("formTitle").textContent="Edit entry"; $("saveBtn").textContent="Save changes"; $("cancelEdit").hidden=false;
       state.returnTab = state.tab; showTab("log"); $("fTime").focus({preventScroll:true});
     } else if(b.dataset.del){ state.confirmDel=b.dataset.del; renderDay(); renderLedger(); }
@@ -1028,8 +1026,7 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
   function openAddTk(t){
     state.tEditing = t ? t.key : null;
     $("tCompany").value = t ? t.company : (state.tCo || ""); $("tTicket").value = t ? t.ticket : ""; $("tTitle").value = t ? (t.title||"") : "";
-    $("tSave").textContent = t ? "Save" : "Add ticket"; $("tErr").textContent = "";
-    $("tEst").value = ""; $("tEstWrap").hidden = !!t;
+    $("tSave").textContent = t ? "Save" : "Add ticket"; $("tErr").textContent = ""; $("tNB").checked = !!(t && t.nonBill);
     $("addTk").hidden = false; $("tCompany").focus({preventScroll:true});
   }
   function closeAddTk(){ $("addTk").hidden = true; state.tEditing = null; }
@@ -1048,7 +1045,7 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
       try{
         // Renaming moves every logged entry for this ticket across, so totals stay together.
         if(co!==t.company || tk!==t.ticket){ for(const e of t.entries) await col.doc(e.id).update({ company:co, ticket:tk }); }
-        await tcol.doc(nk).set(tDoc(t, { company:co, ticket:tk, title:$("tTitle").value.trim() }));
+        await tcol.doc(nk).set(tDoc(t, { company:co, ticket:tk, title:$("tTitle").value.trim(), nonBill:$("tNB").checked }));
         if(nk!==t.key && t.saved) await tcol.doc(t.key).delete();
         if(state.tOpen===t.key) state.tOpen = nk;
         closeAddTk();
@@ -1060,9 +1057,7 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     if(!co || !tk){ $("tErr").textContent="Add a company and ticket number."; return; }
     const k = tKey(co, tk);
     if(allTickets().some(t=>t.key===k)){ $("tErr").textContent="That ticket is already on the list."; return; }
-    const ev0 = $("tEst").value.trim(), em = ev0 ? parseTime(ev0) : null;
-    if(ev0 && !(em>0)){ $("tErr").textContent="Enter hours left to bill like 0.5, 2 or 4, or leave it blank."; return; }
-    await tcol.doc(k).set({ company:co, ticket:tk, title:$("tTitle").value.trim(), status:"open", estLeft: em ? q15(em) : null, estSince: em ? Date.now() : null, createdAt:Date.now(), updatedAt:Date.now() });
+    await tcol.doc(k).set({ company:co, ticket:tk, title:$("tTitle").value.trim(), status:"open", nonBill:$("tNB").checked, createdAt:Date.now(), updatedAt:Date.now() });
     state.tStatus = state.tStatus==="closed" ? "open" : state.tStatus;
     closeAddTk();
   });
@@ -1070,26 +1065,12 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
   try{ const s=localStorage.getItem("ttt-tstatus"); if(["open","hold","closed","all"].includes(s)) state.tStatus=s; }catch(_){}
   $("tFilterCo").addEventListener("change", e=>{ state.tCo=e.target.value; renderTickets(); });
   $("tSearch").addEventListener("input", e=>{ state.tQ=e.target.value; renderTickets(); });
-  $("tList").addEventListener("submit", async ev=>{
-    const f = ev.target.closest("[data-estform]"); if(!f) return;
-    ev.preventDefault();
-    const t = allTickets().find(x=>x.key===f.dataset.estform); if(!t || !tcol) return;
-    const v = f.querySelector("input").value.trim(), m = v==="" ? 0 : parseTime(v);
-    if(typeof m!=="number" || !(m>=0)){ f.querySelector("[data-esterr]").textContent = "Enter hours like 0.5, 2 or 4."; return; }
-    state.tEst = null;
-    await tcol.doc(t.key).set(tDoc(t, { estLeft: q15(m||0), estSince: Date.now() }));
-  });
   $("tList").addEventListener("click", async ev=>{
     const b = ev.target.closest("button"); if(!b) return;
     const find = k => allTickets().find(t=>t.key===k);
     if(b.dataset.tshow){ state.tOpen = state.tOpen===b.dataset.tshow ? null : b.dataset.tshow; renderTickets(); return; }
-    if(b.dataset.estset){ state.tEst = b.dataset.estset; renderTickets(); const i=document.querySelector(`[data-estform] input`); if(i){ i.focus({preventScroll:true}); i.select(); } return; }
-    if(b.dataset.estcancel){ state.tEst = null; renderTickets(); return; }
-    if(b.dataset.estq){ const i=b.closest("form").querySelector("input"); i.value=b.dataset.estq; i.focus({preventScroll:true}); return; }
-    if(b.dataset.estclear){ const t=find(b.dataset.estclear); if(!t||!tcol) return; state.tEst=null;
-      await tcol.doc(t.key).set(tDoc(t, { estLeft:null, estSince:null })); return; }
     if(b.dataset.tlog){ const t=find(b.dataset.tlog); if(!t) return; if(state.editing) resetForm(false);
-      $("fCompany").value=t.company; $("fTicket").value=t.ticket; $("fDate").value=todayIso(); renderDatalists(); renderPicks();
+      $("fCompany").value=t.company; $("fTicket").value=t.ticket; $("fDate").value=todayIso(); renderDatalists(); renderPicks(); syncNB();
       showTab("log"); $("fTime").focus({preventScroll:true}); return; }
     if(b.dataset.tedit){ const t=find(b.dataset.tedit); if(t){ openAddTk(t); window.scrollTo({top:0}); } return; }
     if(b.dataset.tdel){ state.tConfirmDel=b.dataset.tdel; renderTickets(); return; }
@@ -1116,8 +1097,9 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
   $("exportBtn").addEventListener("click", async ()=>{
     if(!downloads) return;
     const q = v => '"'+String(v??"").replace(/"/g,'""')+'"';
-    const lines=[["Company","Ticket Number","Description","Date","Hours","On X-Suite"].map(q).join(",")]
-      .concat(visible().map(e=>[e.company,e.ticket,e.description,e.date,decHours(e.minutes),e.onXsuite?"Yes":"No"].map(q).join(",")));
+    const nbs = nbSet();
+    const lines=[["Company","Ticket Number","Description","Date","Hours","Billable","On X-Suite"].map(q).join(",")]
+      .concat(visible().map(e=>[e.company,e.ticket,e.description,e.date,decHours(e.minutes),nbs.has(entKey(e))?"No":"Yes",e.onXsuite?"Yes":"No"].map(q).join(",")));
     saveFile("time-entries-"+todayIso()+".csv", lines.join("\n"), "text/csv");
   });
 
