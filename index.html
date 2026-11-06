@@ -199,6 +199,12 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
 .nt-head .tk-title{flex-basis:100%}
 .nt-group textarea{font:inherit;font-size:.95rem;line-height:1.45;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;width:100%;min-height:4.6em;resize:vertical;field-sizing:content;max-height:60vh}
 .nt-group textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
+.nt-figs{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:.8rem;color:var(--muted);white-space:nowrap}
+.nt-figs b{font-family:var(--f-mono);font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums}
+.nt-figs label{display:inline-flex;align-items:center;gap:4px;font-size:.8rem;font-weight:400;letter-spacing:0;text-transform:none;color:var(--muted)}
+.nt-figs input{width:3.6rem;padding:3px 6px;font-family:var(--f-mono);font-size:.85rem;text-align:right;background:var(--surface)}
+.nt-figs input.tb-on{border-color:var(--accent);color:var(--accent);font-weight:600}
+.nt-figs .sep{width:1px;height:14px;background:var(--line)}
 .nt-meta{font-size:.75rem;color:var(--muted);min-height:1em}
 .nt-meta.saving{color:var(--warn)}
 .tsum{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:.85rem;color:var(--muted)}
@@ -830,12 +836,13 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
       const t = m[k] ||= { key:k, company:d.company, ticket:d.ticket, title:"", status:"open", minutes:0, entries:[], last:"", createdAt:d.createdAt||0 };
       t.title = d.title||""; t.status = d.status==="closed" ? "closed" : d.status==="hold" ? "hold" : "open"; t.saved = true; t.nonBill = !!d.nonBill;
       t.notes = typeof d.notes==="string" ? d.notes : ""; t.notesAt = d.notesAt||0;
+      t.toBill = typeof d.toBill==="number" ? d.toBill : null;
       if(!t.entries.length){ t.company = d.company; t.ticket = d.ticket; }
     });
     return Object.values(m);
   }
   // The full saved record for a ticket, so changing one field never drops another.
-  const tDoc = (t, o={}) => ({ company:t.company, ticket:t.ticket, title:t.title||"", status:t.status||"open", nonBill:!!t.nonBill, notes:t.notes||"", notesAt:t.notesAt||null,
+  const tDoc = (t, o={}) => ({ company:t.company, ticket:t.ticket, title:t.title||"", status:t.status||"open", nonBill:!!t.nonBill, notes:t.notes||"", notesAt:t.notesAt||null, toBill:(t.toBill==null?null:t.toBill),
     createdAt:t.createdAt||Date.now(), updatedAt:Date.now(), ...o });
   const byRecent = (a,b)=> (b.last||"").localeCompare(a.last||"") || (b.createdAt||0)-(a.createdAt||0);
   function knownCompanies(){
@@ -916,16 +923,19 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
   function renderNotes(){
     const all = allTickets(), q = norm($("nSearch").value);
     const withNotes = all.filter(t=>(t.notes||"").trim());
-    $("nSum").textContent = withNotes.length ? `${withNotes.length} ticket${withNotes.length===1?"":"s"} with notes` : "";
+    const tbTot = all.filter(t=>t.status!=="closed").reduce((a,t)=>a+(t.toBill||0),0);
+    $("nSum").textContent = [withNotes.length ? `${withNotes.length} ticket${withNotes.length===1?"":"s"} with notes` : "", tbTot ? `${fmtMins(tbTot)} to bill` : ""].filter(Boolean).join(" · ");
     // Don't redraw while you're typing in a box; it refreshes when you leave it.
     const act = document.activeElement;
-    if(act && act.dataset && act.dataset.note && $("nList").contains(act)) return;
+    if(act && act.dataset && (act.dataset.note || act.dataset.tobill) && $("nList").contains(act)) return;
     let list = state.nShow==="notes" ? withNotes : all.filter(t=>t.status!=="closed" || (t.notes||"").trim() && state.nForce===t.key);
     if(state.nForce && !list.some(t=>t.key===state.nForce)){ const f=all.find(t=>t.key===state.nForce); if(f) list.push(f); }
     if(q) list = list.filter(t=>norm(t.ticket+" "+t.company+" "+t.title+" "+(t.notes||"")).includes(q));
     list.sort((a,b)=> (ST_ORDER[a.status]-ST_ORDER[b.status]) || byRecent(a,b));
     $("nList").innerHTML = list.length ? list.map(t=>`<div class="nt-group ${t.status==="open"?"":t.status}" data-ngroup="${esc(t.key)}">
-        <div class="nt-head"><span class="tk-id">${esc(t.ticket)}${t.status!=="open"?` <span class="chip ${ST_CHIP[t.status]}">${ST_LABEL[t.status]}</span>`:""}</span><span class="tk-co">${esc(t.company)}</span>${t.title?`<span class="tk-title">${esc(t.title)}</span>`:""}</div>
+        <div class="nt-head"><span class="tk-id">${esc(t.ticket)}${t.status!=="open"?` <span class="chip ${ST_CHIP[t.status]}">${ST_LABEL[t.status]}</span>`:""}</span><span class="tk-co">${esc(t.company)}</span>
+          <span class="nt-figs"><span title="${t.nonBill?"Total hours logged (non-billable ticket)":"Total hours billed on this ticket"}"><b>${fmtMins(t.minutes)}</b> ${t.nonBill?"n/b":"billed"}</span><span class="sep" aria-hidden="true"></span><label title="Hours still to bill"><input data-tobill="${esc(t.key)}" inputmode="decimal" autocomplete="off" class="${t.toBill?"tb-on":""}" value="${t.toBill==null?"":esc(decHours(t.toBill))}" placeholder="–" aria-label="Hours to bill on ${esc(t.ticket)}">to bill</label></span>
+          ${t.title?`<span class="tk-title">${esc(t.title)}</span>`:""}</div>
         <textarea data-note="${esc(t.key)}" rows="3" placeholder="Next steps, what you're waiting on, anything to remember…" aria-label="Notes for ${esc(t.ticket)}">${esc(t.notes||"")}</textarea>
         <div class="nt-meta" data-nmeta="${esc(t.key)}">${t.notesAt?"Last edited "+esc(shortDay(iso(new Date(t.notesAt)))):""}</div>
       </div>`).join("")
@@ -1129,6 +1139,17 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     const k = a.dataset.note; clearTimeout(noteTimers[k]);
     saveNote(k, a.value).then(()=>setTimeout(()=>{ if(!$("nList").contains(document.activeElement) || !document.activeElement.dataset.note) renderNotes(); }, 0));
   });
+  async function saveToBill(inp){
+    const k = inp.dataset.tobill, t = allTickets().find(x=>x.key===k); if(!t || !tcol) return;
+    const v = inp.value.trim(), m = v==="" ? null : parseTime(v);
+    if(v!=="" && !(typeof m==="number" && m>=0)){ inp.value = t.toBill==null ? "" : decHours(t.toBill); return; }
+    const next = m==null ? null : q15(m);
+    if(next===t.toBill) { renderNotes(); return; }
+    try{ await tcol.doc(k).set(tDoc(t, { toBill: next })); }catch(_){}
+    setTimeout(()=>{ const a=document.activeElement; if(!(a && a.dataset && (a.dataset.note||a.dataset.tobill))) renderNotes(); }, 0);
+  }
+  $("nList").addEventListener("change", ev=>{ const i=ev.target.closest("[data-tobill]"); if(i) saveToBill(i); });
+  $("nList").addEventListener("keydown", ev=>{ const i=ev.target.closest("[data-tobill]"); if(i && ev.key==="Enter"){ ev.preventDefault(); i.blur(); } });
   $("nSeg").addEventListener("click", ev=>{ const b=ev.target.closest("[data-nshow]"); if(!b) return; state.nShow=b.dataset.nshow; state.nForce=null;
     document.querySelectorAll("#nSeg button").forEach(x=>x.setAttribute("aria-pressed", String(x===b))); try{ localStorage.setItem("ttt-nshow", state.nShow); }catch(_){} renderNotes(); });
   try{ const v=localStorage.getItem("ttt-nshow"); if(v==="open"||v==="notes"){ state.nShow=v; document.querySelectorAll("#nSeg button").forEach(x=>x.setAttribute("aria-pressed", String(x.dataset.nshow===v))); } }catch(_){}
