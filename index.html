@@ -189,30 +189,18 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
 .pick[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent)}
 .opt{font-weight:400;text-transform:none;letter-spacing:0}
 /* tickets tab */
-#tdList{display:grid;gap:10px}
-.td-group{border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;padding:10px 12px;display:grid;gap:6px;min-width:0}
-.td-group.hold{border-left-color:var(--warn)}
-.td-group.closed{border-left-color:var(--line)}
-.td-group.flash{box-shadow:0 0 0 2px var(--accent)}
-.td-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px}
-.td-head .tk-id{font-size:.95rem}
-.td-head .tk-co{font-size:.92rem}
-.td-head .tk-title{flex-basis:100%}
-.td-head .cnt{margin-left:auto;font-size:.78rem;color:var(--muted);white-space:nowrap}
-.td-items{display:grid;gap:0}
-.td-item{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:start;padding:7px 0;border-bottom:1px solid var(--line)}
-.td-item:last-child{border-bottom:0}
-.td-item input[type=checkbox]{width:20px;height:20px;margin:1px 0 0;accent-color:var(--accent);cursor:pointer}
-.td-item .tx{overflow-wrap:anywhere;line-height:1.4}
-.td-item .tx small{display:block;color:var(--muted);font-size:.74rem;margin-top:1px}
-.td-item.done .tx{color:var(--muted);text-decoration:line-through}
-.td-item .x{background:transparent;border:0;color:var(--muted);padding:0 4px;font-size:1.1rem;line-height:1;cursor:pointer}
-.td-item .x:hover{color:var(--danger)}
-.td-add{display:flex;gap:6px}
-.td-add input{flex:1 1 auto;min-width:0;padding:7px 10px}
-.td-done{justify-self:start;padding:2px 0}
-.td-quick{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr) auto;gap:8px;align-items:end}
-@media (max-width:640px){.td-quick{grid-template-columns:minmax(0,1fr) auto}.td-quick .wideq{grid-column:1 / -1}}
+#nList{display:grid;gap:10px}
+.nt-group{border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;padding:10px 12px;display:grid;gap:6px;min-width:0}
+.nt-group.hold{border-left-color:var(--warn)}
+.nt-group.closed{border-left-color:var(--line)}
+.nt-group.flash{box-shadow:0 0 0 2px var(--accent)}
+.nt-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px}
+.nt-head .tk-co{font-size:.92rem}
+.nt-head .tk-title{flex-basis:100%}
+.nt-group textarea{font:inherit;font-size:.95rem;line-height:1.45;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;width:100%;min-height:4.6em;resize:vertical;field-sizing:content;max-height:60vh}
+.nt-group textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
+.nt-meta{font-size:.75rem;color:var(--muted);min-height:1em}
+.nt-meta.saving{color:var(--warn)}
 .tsum{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:.85rem;color:var(--muted)}
 .tsum b{font-family:var(--f-mono);color:var(--ink);font-variant-numeric:tabular-nums}
 .tk-card{border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;padding:10px 12px;display:grid;gap:8px;min-width:0}
@@ -279,7 +267,7 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     <button type="button" role="tab" data-tab="calendar" aria-selected="false">Calendar</button>
     <button type="button" role="tab" data-tab="log" aria-selected="false">Log Time</button>
     <button type="button" role="tab" data-tab="tickets" aria-selected="false">Tickets</button>
-    <button type="button" role="tab" data-tab="todo" aria-selected="false">To Do</button>
+    <button type="button" role="tab" data-tab="notes" aria-selected="false">Notes</button>
     <button type="button" role="tab" data-tab="entries" aria-selected="false">Entries</button>
   </nav>
 
@@ -408,28 +396,19 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     </form>
   </section>
 
-  <section class="panel" aria-labelledby="tdTitle" data-pane="todo" hidden>
+  <section class="panel" aria-labelledby="nTitle" data-pane="notes" hidden>
     <div class="listhead">
-      <h2 id="tdTitle">To Do</h2>
-      <span class="muted" style="font-size:.85rem" id="tdSum"></span>
+      <h2 id="nTitle">Notes</h2>
+      <span class="muted" style="font-size:.85rem" id="nSum"></span>
     </div>
-    <form class="td-quick" id="tdQuick" novalidate>
-      <label class="wideq">Ticket
-        <select id="tdTicket"></select>
-      </label>
-      <label>Next step
-        <input id="tdText" autocomplete="off" placeholder="e.g. Chase client for logs">
-      </label>
-      <button type="submit" class="primary">Add</button>
-    </form>
-    <p class="err" id="tdErr" role="alert"></p>
     <div class="filters">
-      <div class="seg" role="group" aria-label="Show" id="tdSeg">
-        <button type="button" data-tdshow="todo" aria-pressed="true">With to-dos</button>
-        <button type="button" data-tdshow="all" aria-pressed="false">All open tickets</button>
+      <div class="seg" role="group" aria-label="Show" id="nSeg">
+        <button type="button" data-nshow="open" aria-pressed="true">Open tickets</button>
+        <button type="button" data-nshow="notes" aria-pressed="false">With notes</button>
       </div>
+      <input id="nSearch" type="search" placeholder="Search tickets or notes" aria-label="Search notes">
     </div>
-    <div class="tklist" id="tdList"></div>
+    <div id="nList"></div>
   </section>
 
   <section class="panel" aria-labelledby="tkTitle" data-pane="tickets" hidden>
@@ -843,20 +822,20 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     sorted.forEach(e=>{
       if(!e.company || !e.ticket) return;
       const k = tKey(e.company, e.ticket);
-      const t = m[k] ||= { key:k, company:e.company, ticket:e.ticket, title:"", status:"open", minutes:0, entries:[], last:"", createdAt:e.createdAt||0, todos:[] };
+      const t = m[k] ||= { key:k, company:e.company, ticket:e.ticket, title:"", status:"open", minutes:0, entries:[], last:"", createdAt:e.createdAt||0 };
       t.company = e.company; t.ticket = e.ticket; // latest spelling wins
       t.minutes += q15(e.minutes); t.entries.push(e); t.last = e.date;
     });
     Object.entries(state.tickets).forEach(([k,d])=>{
-      const t = m[k] ||= { key:k, company:d.company, ticket:d.ticket, title:"", status:"open", minutes:0, entries:[], last:"", createdAt:d.createdAt||0, todos:[] };
+      const t = m[k] ||= { key:k, company:d.company, ticket:d.ticket, title:"", status:"open", minutes:0, entries:[], last:"", createdAt:d.createdAt||0 };
       t.title = d.title||""; t.status = d.status==="closed" ? "closed" : d.status==="hold" ? "hold" : "open"; t.saved = true; t.nonBill = !!d.nonBill;
-      t.todos = Array.isArray(d.todos) ? d.todos.filter(x=>x && x.id && typeof x.text==="string") : [];
+      t.notes = typeof d.notes==="string" ? d.notes : ""; t.notesAt = d.notesAt||0;
       if(!t.entries.length){ t.company = d.company; t.ticket = d.ticket; }
     });
     return Object.values(m);
   }
   // The full saved record for a ticket, so changing one field never drops another.
-  const tDoc = (t, o={}) => ({ company:t.company, ticket:t.ticket, title:t.title||"", status:t.status||"open", nonBill:!!t.nonBill, todos:(t.todos||[]),
+  const tDoc = (t, o={}) => ({ company:t.company, ticket:t.ticket, title:t.title||"", status:t.status||"open", nonBill:!!t.nonBill, notes:t.notes||"", notesAt:t.notesAt||null,
     createdAt:t.createdAt||Date.now(), updatedAt:Date.now(), ...o });
   const byRecent = (a,b)=> (b.last||"").localeCompare(a.last||"") || (b.createdAt||0)-(a.createdAt||0);
   function knownCompanies(){
@@ -913,7 +892,7 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
         ${moves.map(([to,l])=>`<button type="button" class="ghost" data-tstat="${esc(t.key)}" data-to="${to}">${l}</button>`).join("")}
         <button type="button" class="ghost" data-tshow="${esc(t.key)}" aria-expanded="${isOpen}">${isOpen?"Hide entries":"Entries"}</button>
         <button type="button" class="ghost" data-tedit="${esc(t.key)}">Edit</button>
-        <button type="button" class="ghost" data-tgotodo="${esc(t.key)}">To do${(t.todos||[]).filter(x=>!x.done).length?` (${(t.todos||[]).filter(x=>!x.done).length})`:""}</button>
+        <button type="button" class="ghost" data-tgonotes="${esc(t.key)}">Notes${(t.notes||"").trim()?" ●":""}</button>
         ${del}
       </div>${ents}
     </div>`;
@@ -932,49 +911,34 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
       : all.length ? `<div class="empty"><b>No ${state.tStatus==="all"?"":ST_LABEL[state.tStatus].toLowerCase()+" "}tickets here</b>Try another filter or clear the search.</div>`
       : `<div class="empty"><b>No tickets yet</b>Tap “Add ticket”, or log time and the ticket appears here automatically.</div>`;
   }
-  // ---- to do ----
-  const openTodos = t => (t.todos||[]).filter(x=>!x.done);
-  function renderTodos(){
-    // keep whatever is being typed if the list redraws (e.g. a sync arrives)
-    const act = document.activeElement, keepKey = act && act.dataset && act.dataset.tdadd, keepVal = keepKey ? act.value : "";
-    const all = allTickets(), live = all.filter(t=>t.status!=="closed");
-    const withOpen = all.filter(t=>openTodos(t).length);
-    const nOpen = withOpen.reduce((a,t)=>a+openTodos(t).length,0);
-    $("tdSum").textContent = nOpen ? `${nOpen} to-do${nOpen===1?"":"s"} across ${withOpen.length} ticket${withOpen.length===1?"":"s"}` : "Nothing to do";
-    const sel = $("tdTicket"), cur = sel.value;
-    sel.innerHTML = live.sort(byRecent).map(t=>`<option value="${esc(t.key)}">${esc(t.ticket)} · ${esc(t.company)}${t.title?" · "+esc(t.title):""}</option>`).join("") || `<option value="">Add a ticket first</option>`;
-    if(cur && live.some(t=>t.key===cur)) sel.value = cur;
-    const show = state.tdShow==="all" ? live.concat(withOpen.filter(t=>t.status==="closed")) : withOpen;
-    show.sort((a,b)=> (openTodos(b).length?1:0)-(openTodos(a).length?1:0) || (ST_ORDER[a.status]-ST_ORDER[b.status]) || byRecent(a,b));
-    $("tdList").innerHTML = show.length ? show.map(todoGroupHtml).join("")
-      : `<div class="empty"><b>${state.tdShow==="all"?"No open tickets":"No to-dos yet"}</b>${state.tdShow==="all"?"Add a ticket on the Tickets tab.":"Pick a ticket above and add your next step, or switch to “All open tickets”."}</div>`;
-    if(keepKey){ const i=document.querySelector(`[data-tdadd="${CSS.escape(keepKey)}"]`); if(i){ i.value=keepVal; i.focus({preventScroll:true}); } }
+  // ---- notes: one free-text box per ticket, saved as you type ----
+  const noteTimers = {};
+  function renderNotes(){
+    const all = allTickets(), q = norm($("nSearch").value);
+    const withNotes = all.filter(t=>(t.notes||"").trim());
+    $("nSum").textContent = withNotes.length ? `${withNotes.length} ticket${withNotes.length===1?"":"s"} with notes` : "";
+    // Don't redraw while you're typing in a box; it refreshes when you leave it.
+    const act = document.activeElement;
+    if(act && act.dataset && act.dataset.note && $("nList").contains(act)) return;
+    let list = state.nShow==="notes" ? withNotes : all.filter(t=>t.status!=="closed" || (t.notes||"").trim() && state.nForce===t.key);
+    if(state.nForce && !list.some(t=>t.key===state.nForce)){ const f=all.find(t=>t.key===state.nForce); if(f) list.push(f); }
+    if(q) list = list.filter(t=>norm(t.ticket+" "+t.company+" "+t.title+" "+(t.notes||"")).includes(q));
+    list.sort((a,b)=> (ST_ORDER[a.status]-ST_ORDER[b.status]) || byRecent(a,b));
+    $("nList").innerHTML = list.length ? list.map(t=>`<div class="nt-group ${t.status==="open"?"":t.status}" data-ngroup="${esc(t.key)}">
+        <div class="nt-head"><span class="tk-id">${esc(t.ticket)}${t.status!=="open"?` <span class="chip ${ST_CHIP[t.status]}">${ST_LABEL[t.status]}</span>`:""}</span><span class="tk-co">${esc(t.company)}</span>${t.title?`<span class="tk-title">${esc(t.title)}</span>`:""}</div>
+        <textarea data-note="${esc(t.key)}" rows="3" placeholder="Next steps, what you're waiting on, anything to remember…" aria-label="Notes for ${esc(t.ticket)}">${esc(t.notes||"")}</textarea>
+        <div class="nt-meta" data-nmeta="${esc(t.key)}">${t.notesAt?"Last edited "+esc(shortDay(iso(new Date(t.notesAt)))):""}</div>
+      </div>`).join("")
+      : `<div class="empty"><b>${q?"No matches":state.nShow==="notes"?"No notes yet":"No open tickets"}</b>${q?"Try a different search.":state.nShow==="notes"?"Switch to “Open tickets” and type in any ticket's box.":"Add a ticket on the Tickets tab."}</div>`;
   }
-  function todoGroupHtml(t){
-    const items = (t.todos||[]).slice().sort((a,b)=> (a.done?1:0)-(b.done?1:0) || (a.done ? (b.doneAt||0)-(a.doneAt||0) : (a.createdAt||0)-(b.createdAt||0)));
-    const open = items.filter(x=>!x.done), done = items.filter(x=>x.done);
-    const showDone = state.tdDoneOpen===t.key;
-    const item = x => `<div class="td-item ${x.done?"done":""}">
-        <input type="checkbox" ${x.done?"checked":""} data-tdtick="${esc(t.key)}" data-id="${esc(x.id)}" aria-label="${x.done?"Mark not done":"Mark done"}: ${esc(x.text)}">
-        <span class="tx">${esc(x.text)}<small>${x.done&&x.doneAt?"Done "+esc(shortDay(iso(new Date(x.doneAt)))):"Added "+esc(shortDay(iso(new Date(x.createdAt||Date.now()))))}</small></span>
-        <button type="button" class="x" data-tddel="${esc(t.key)}" data-id="${esc(x.id)}" aria-label="Delete: ${esc(x.text)}">×</button>
-      </div>`;
-    return `<div class="td-group ${t.status==="open"?"":t.status}" data-tdgroup="${esc(t.key)}">
-      <div class="td-head"><span class="tk-id">${esc(t.ticket)}${t.status!=="open"?` <span class="chip ${ST_CHIP[t.status]}">${ST_LABEL[t.status]}</span>`:""}</span><span class="tk-co">${esc(t.company)}</span>
-        <span class="cnt">${open.length?open.length+" to do":"All done"}</span>${t.title?`<span class="tk-title">${esc(t.title)}</span>`:""}</div>
-      ${open.length?`<div class="td-items">${open.map(item).join("")}</div>`:""}
-      <form class="td-add" data-tdform="${esc(t.key)}" novalidate><input data-tdadd="${esc(t.key)}" autocomplete="off" placeholder="Add next step…" aria-label="Add a to-do for ${esc(t.ticket)}"><button type="submit" class="small">Add</button></form>
-      ${done.length?`<button type="button" class="ghost td-done" data-tddone="${esc(t.key)}" aria-expanded="${showDone}">${showDone?"Hide":"Show"} ${done.length} done</button>${showDone?`<div class="td-items">${done.map(item).join("")}</div>`:""}`:""}
-    </div>`;
+  async function saveNote(key, text){
+    const t = allTickets().find(x=>x.key===key), meta = document.querySelector(`[data-nmeta="${CSS.escape(key)}"]`);
+    if(!t || !tcol) return;
+    if((t.notes||"")===text){ if(meta){ meta.classList.remove("saving"); } return; }
+    try{ await tcol.doc(key).set(tDoc(t, { notes:text, notesAt:Date.now() })); if(meta){ meta.classList.remove("saving"); meta.textContent="Saved"; } }
+    catch(_){ if(meta){ meta.classList.add("saving"); meta.textContent="Couldn't save. Keep typing to retry."; } }
   }
-  async function saveTodos(key, fn){
-    const t = allTickets().find(x=>x.key===key); if(!t || !tcol) return false;
-    const next = fn((t.todos||[]).map(x=>({...x})));
-    try{ await tcol.doc(key).set(tDoc(t, { todos: next })); return true; }
-    catch(_){ $("tdErr").textContent = "Couldn't save that. Try again."; return false; }
-  }
-  const newTodo = text => ({ id: Date.now().toString(36)+Math.random().toString(36).slice(2,6), text, done:false, createdAt:Date.now() });
-  function render(){ renderCompanies(); renderBonus(); renderCal(); renderDay(); renderLedger(); renderTickets(); renderTodos(); renderDatalists(); renderPicks(); }
+  function render(){ renderCompanies(); renderBonus(); renderCal(); renderDay(); renderLedger(); renderTickets(); renderNotes(); renderDatalists(); renderPicks(); }
 
   // ---- settings (office-closed days and holidays) ----
   let saving = Promise.resolve();
@@ -1055,7 +1019,7 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
   $("cancelEdit").addEventListener("click", ()=>{ resetForm(false); if(state.returnTab){ showTab(state.returnTab); state.returnTab=null; } });
 
   // ---- tabs ----
-  const TABS = ["bonus","calendar","log","tickets","todo","entries"];
+  const TABS = ["bonus","calendar","log","tickets","notes","entries"];
   function showTab(name){
     if(!TABS.includes(name)) name="bonus";
     state.tab = name;
@@ -1154,32 +1118,23 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     state.tStatus = state.tStatus==="closed" ? "open" : state.tStatus;
     closeAddTk();
   });
-  $("tdQuick").addEventListener("submit", async ev=>{
-    ev.preventDefault(); $("tdErr").textContent="";
-    const key=$("tdTicket").value, text=$("tdText").value.trim();
-    if(!key){ $("tdErr").textContent="Add a ticket on the Tickets tab first."; return; }
-    if(!text){ $("tdErr").textContent="Type the next step first."; $("tdText").focus(); return; }
-    if(await saveTodos(key, l=>l.concat(newTodo(text)))){ $("tdText").value=""; $("tdText").focus({preventScroll:true}); }
+  $("nList").addEventListener("input", ev=>{
+    const a = ev.target.closest("[data-note]"); if(!a) return;
+    const k = a.dataset.note, meta = document.querySelector(`[data-nmeta="${CSS.escape(k)}"]`);
+    if(meta){ meta.classList.add("saving"); meta.textContent="Saving…"; }
+    clearTimeout(noteTimers[k]); noteTimers[k] = setTimeout(()=>saveNote(k, a.value), 800);
   });
-  $("tdList").addEventListener("submit", async ev=>{
-    const f=ev.target.closest("[data-tdform]"); if(!f) return; ev.preventDefault(); $("tdErr").textContent="";
-    const i=f.querySelector("input"), text=i.value.trim(); if(!text) return;
-    i.value=""; await saveTodos(f.dataset.tdform, l=>l.concat(newTodo(text)));
-    const again=document.querySelector(`[data-tdadd="${CSS.escape(f.dataset.tdform)}"]`); if(again) again.focus({preventScroll:true});
+  $("nList").addEventListener("focusout", ev=>{
+    const a = ev.target.closest("[data-note]"); if(!a) return;
+    const k = a.dataset.note; clearTimeout(noteTimers[k]);
+    saveNote(k, a.value).then(()=>setTimeout(()=>{ if(!$("nList").contains(document.activeElement) || !document.activeElement.dataset.note) renderNotes(); }, 0));
   });
-  $("tdList").addEventListener("change", async ev=>{
-    const c=ev.target.closest("[data-tdtick]"); if(!c) return;
-    const done=c.checked, id=c.dataset.id;
-    await saveTodos(c.dataset.tdtick, l=>l.map(x=> x.id===id ? {...x, done, doneAt: done?Date.now():null} : x));
-  });
-  $("tdList").addEventListener("click", async ev=>{
-    const b=ev.target.closest("button"); if(!b) return;
-    if(b.dataset.tddel){ const id=b.dataset.id; await saveTodos(b.dataset.tddel, l=>l.filter(x=>x.id!==id)); }
-    else if(b.dataset.tddone){ state.tdDoneOpen = state.tdDoneOpen===b.dataset.tddone ? null : b.dataset.tddone; renderTodos(); }
-  });
-  $("tdSeg").addEventListener("click", ev=>{ const b=ev.target.closest("[data-tdshow]"); if(!b) return; state.tdShow=b.dataset.tdshow;
-    document.querySelectorAll("#tdSeg button").forEach(x=>x.setAttribute("aria-pressed", String(x===b))); try{ localStorage.setItem("ttt-tdshow", state.tdShow); }catch(_){} renderTodos(); });
-  try{ const v=localStorage.getItem("ttt-tdshow"); if(v==="all"||v==="todo"){ state.tdShow=v; document.querySelectorAll("#tdSeg button").forEach(x=>x.setAttribute("aria-pressed", String(x.dataset.tdshow===v))); } }catch(_){}
+  $("nSeg").addEventListener("click", ev=>{ const b=ev.target.closest("[data-nshow]"); if(!b) return; state.nShow=b.dataset.nshow; state.nForce=null;
+    document.querySelectorAll("#nSeg button").forEach(x=>x.setAttribute("aria-pressed", String(x===b))); try{ localStorage.setItem("ttt-nshow", state.nShow); }catch(_){} renderNotes(); });
+  try{ const v=localStorage.getItem("ttt-nshow"); if(v==="open"||v==="notes"){ state.nShow=v; document.querySelectorAll("#nSeg button").forEach(x=>x.setAttribute("aria-pressed", String(x.dataset.nshow===v))); } }catch(_){}
+  $("nSearch").addEventListener("input", renderNotes);
+  // Save anything half-typed if the page is closed or hidden.
+  window.addEventListener("pagehide", ()=>{ document.querySelectorAll("[data-note]").forEach(a=>{ if(noteTimers[a.dataset.note]){ clearTimeout(noteTimers[a.dataset.note]); saveNote(a.dataset.note, a.value); } }); });
   $("tStatusSeg").addEventListener("click", ev=>{ const b=ev.target.closest("[data-tstatus]"); if(!b) return; state.tStatus=b.dataset.tstatus; try{ localStorage.setItem("ttt-tstatus", state.tStatus); }catch(_){} renderTickets(); });
   try{ const s=localStorage.getItem("ttt-tstatus"); if(["open","hold","closed","all"].includes(s)) state.tStatus=s; }catch(_){}
   $("tFilterCo").addEventListener("change", e=>{ state.tCo=e.target.value; renderTickets(); });
@@ -1187,14 +1142,11 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
   $("tList").addEventListener("click", async ev=>{
     const b = ev.target.closest("button"); if(!b) return;
     const find = k => allTickets().find(t=>t.key===k);
-    if(b.dataset.tgotodo){
-      const k=b.dataset.tgotodo, t=allTickets().find(x=>x.key===k); if(!t) return;
-      if(!openTodos(t).length && t.status==="closed"){ state.tdShow="all"; }
-      if(!openTodos(t).length && state.tdShow!=="all"){ state.tdShow="all"; document.querySelectorAll("#tdSeg button").forEach(x=>x.setAttribute("aria-pressed", String(x.dataset.tdshow==="all"))); }
-      showTab("todo"); renderTodos(); $("tdTicket").value=k;
-      const g=document.querySelector(`[data-tdgroup="${CSS.escape(k)}"]`);
-      if(g){ g.scrollIntoView({block:"center"}); g.classList.add("flash"); setTimeout(()=>g.classList.remove("flash"),1200); const i=g.querySelector("[data-tdadd]"); if(i) i.focus({preventScroll:true}); }
-      else $("tdText").focus({preventScroll:true});
+    if(b.dataset.tgonotes){
+      const k=b.dataset.tgonotes; state.nForce=k; $("nSearch").value="";
+      showTab("notes"); renderNotes();
+      const g=document.querySelector(`[data-ngroup="${CSS.escape(k)}"]`);
+      if(g){ g.scrollIntoView({block:"center"}); g.classList.add("flash"); setTimeout(()=>g.classList.remove("flash"),1200); const a=g.querySelector("textarea"); a.focus({preventScroll:true}); a.setSelectionRange(a.value.length, a.value.length); }
       return;
     }
     if(b.dataset.tshow){ state.tOpen = state.tOpen===b.dataset.tshow ? null : b.dataset.tshow; renderTickets(); return; }
