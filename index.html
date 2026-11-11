@@ -80,17 +80,18 @@ button.danger{color:var(--danger)}
 .tierbar button.here::after{content:"";position:absolute;top:5px;right:6px;width:6px;height:6px;border-radius:50%;background:var(--ok)}
 .tierbar button.got small{font-weight:600}
 .tierbar button[aria-pressed="true"].here::after{background:var(--accent-ink)}
-@media (max-width:520px){.panel .headline{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 12px;align-items:start}.panel .headline .big .v{font-size:1.55rem}.panel .headline .big .s{font-size:.76rem}}
 .big .v.ahead{color:var(--ok)}
 .big .v.short{color:var(--danger)}
 tr.sel td{background:var(--accent-soft);font-weight:600}
 #tierRows tr,#fqRows tr{cursor:pointer}
-.headline{display:flex;flex-wrap:wrap;gap:12px 28px;align-items:flex-end}
-.big{display:grid;gap:0}
-.big .k{font-size:.72rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-.big .v{font-family:var(--f-mono);font-size:2.2rem;line-height:1.1;font-variant-numeric:tabular-nums;font-weight:500}
+/* Each figure sits in its own tile */
+.headline{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.big{display:grid;gap:4px;align-content:start;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0}
+.big .k{font-size:.7rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.big .v{font-family:var(--f-mono);font-size:1.9rem;line-height:1.1;font-variant-numeric:tabular-nums;font-weight:500;overflow-wrap:anywhere}
 .big .v.money{color:var(--ok)}
-.big .s{font-size:.8rem;color:var(--muted)}
+.big .s{font-size:.78rem;color:var(--muted);line-height:1.35}
+@media (max-width:520px){.headline{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.big{padding:11px 12px}.big .v{font-size:1.5rem}.big .s{font-size:.74rem}.big .k{font-size:.66rem;letter-spacing:.08em}}
 .ladder{position:relative;padding-top:22px;padding-bottom:4px;margin-top:6px}
 .ladder .track{position:relative;height:16px;background:var(--bg);border:1px solid var(--line);border-radius:4px}
 .ladder .fill{position:absolute;inset:0 auto 0 0;background:var(--accent);border-radius:3px}
@@ -303,7 +304,7 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
       <div class="big"><span class="k">Logged</span><span class="v" id="bPct">0h</span><span class="s" id="bPctSub"></span></div>
       <div class="big"><span class="k" id="bPaceK">Target so far</span><span class="v" id="bPace">0h</span><span class="s" id="bPaceSub"></span></div>
       <div class="big"><span class="k" id="bGapK">Ahead</span><span class="v" id="bGap">0h</span><span class="s" id="bGapSub"></span></div>
-      <div class="big"><span class="k">Bonus earned so far</span><span class="v money" id="bNow">£0</span><span class="s" id="bNowSub"></span></div>
+      <div class="big"><span class="k">Bonus earned</span><span class="v money" id="bNow">£0</span><span class="s" id="bNowSub"></span></div>
     </div>
     <div class="ladder" aria-hidden="true">
       <div class="track"><div class="fill" id="bFill" style="width:0"></div></div>
@@ -720,7 +721,7 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
       let pd;
       if(hit) pd = `<span class="st">Reached</span>`;
       else if(perDay===Infinity) pd = `<span class="st" style="color:var(--danger)">Out of time</span>`;
-      else pd = fmtMins(Math.ceil(perDay)) + (perDay>DAY ? ` <span class="st" style="color:var(--danger)">over ${HOURS_PER_DAY}h</span>` : "");
+      else pd = fmtMins(Math.ceil(perDay)) + (perDay>DAY ? `<span class="st" style="display:block;color:var(--danger);font-size:.7rem">over ${HOURS_PER_DAY}h</span>` : "");
       return `<tr class="${hit?"hit":""} ${onPace?"sel":""}" data-tier="${TIERS.indexOf(x)}"><td>${Math.round(x.p*100)}%</td><td>${gbp(x.b)}</td><td>${fmtMins(hours)}</td><td>${hit?"—":fmtMins(Math.ceil(need))}</td><td>${pd}</td></tr>`;
     }).join("");
     const bits = ["Quarter target = "+HOURS_PER_DAY+"h × every working day in the quarter (holidays included, office-closed days left out)."];
