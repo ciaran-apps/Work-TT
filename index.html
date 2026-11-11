@@ -70,6 +70,21 @@ button.danger{color:var(--danger)}
 .pill.behind{background:var(--danger-soft);color:var(--danger)}
 .pill.neutral{background:var(--accent-soft);color:var(--ink)}
 .pill.hol{background:var(--hol-soft);color:var(--hol)}
+.tierbar{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;padding:4px;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.tierbar button{display:grid;gap:1px;justify-items:center;border:0;background:transparent;border-radius:7px;padding:7px 2px;color:var(--muted);position:relative}
+.tierbar button b{font-family:var(--f-mono);font-size:1rem;font-weight:600;color:var(--ink)}
+.tierbar button small{font-size:.72rem}
+.tierbar button:hover{background:var(--bg)}
+.tierbar button[aria-pressed="true"]{background:var(--accent)}
+.tierbar button[aria-pressed="true"] b,.tierbar button[aria-pressed="true"] small{color:var(--accent-ink)}
+.tierbar button.here::after{content:"";position:absolute;top:5px;right:6px;width:6px;height:6px;border-radius:50%;background:var(--ok)}
+.tierbar button.got small{font-weight:600}
+.tierbar button[aria-pressed="true"].here::after{background:var(--accent-ink)}
+@media (max-width:520px){.panel .headline{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 12px}.panel .headline .big .v{font-size:1.55rem}.panel .headline .big .s{font-size:.76rem}}
+.big .v.ahead{color:var(--ok)}
+.big .v.short{color:var(--danger)}
+tr.sel td{background:var(--accent-soft);font-weight:600}
+#tierRows tr,#fqRows tr{cursor:pointer}
 .headline{display:flex;flex-wrap:wrap;gap:12px 28px;align-items:flex-end}
 .big{display:grid;gap:0}
 .big .k{font-size:.72rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
@@ -277,15 +292,18 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     <button type="button" role="tab" data-tab="entries" aria-selected="false">Entries</button>
   </nav>
 
+  <div class="tierbar" role="group" aria-label="Bonus tier" id="tierBar" data-pane="bonus"></div>
+
   <section class="panel" aria-labelledby="qTitle" data-pane="bonus">
     <div class="phead">
       <h2 id="qTitle">Target to date</h2>
       <span class="pill neutral" id="qPill">Calculating…</span>
     </div>
     <div class="headline">
-      <div class="big"><span class="k">Achieved</span><span class="v" id="bPct">0%</span><span class="s" id="bPctSub"></span></div>
+      <div class="big"><span class="k">Logged</span><span class="v" id="bPct">0h</span><span class="s" id="bPctSub"></span></div>
+      <div class="big"><span class="k" id="bPaceK">Target so far</span><span class="v" id="bPace">0h</span><span class="s" id="bPaceSub"></span></div>
+      <div class="big"><span class="k" id="bGapK">Ahead</span><span class="v" id="bGap">0h</span><span class="s" id="bGapSub"></span></div>
       <div class="big"><span class="k">Bonus earned so far</span><span class="v money" id="bNow">£0</span><span class="s" id="bNowSub"></span></div>
-      <div class="big"><span class="k">Target so far</span><span class="v" id="bPace">0h</span><span class="s" id="bPaceSub"></span></div>
     </div>
     <div class="ladder" aria-hidden="true">
       <div class="track"><div class="fill" id="bFill" style="width:0"></div></div>
@@ -307,7 +325,7 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
       <span class="pill neutral" id="fqPill">Calculating…</span>
     </div>
     <div class="headline">
-      <div class="big"><span class="k">Quarter target</span><span class="v" id="fqTarget">0h</span><span class="s" id="fqTargetSub"></span></div>
+      <div class="big"><span class="k" id="fqTargetK">Quarter target</span><span class="v" id="fqTarget">0h</span><span class="s" id="fqTargetSub"></span></div>
       <div class="big"><span class="k">Logged so far</span><span class="v" id="fqLogged">0h</span><span class="s" id="fqLoggedSub"></span></div>
       <div class="big"><span class="k">Working days left</span><span class="v" id="fqDays">0</span><span class="s" id="fqDaysSub"></span></div>
       <div class="big"><span class="k">Projected bonus</span><span class="v money" id="fqBonus">—</span><span class="s" id="fqBonusSub"></span></div>
@@ -578,54 +596,69 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
   }
   const tierFor = p => { let t=null; TIERS.forEach(x=>{ if(p>=x.p-1e-9) t=x; }); return t; };
 
+  // The tier the Bonus tab is showing: the one you tap, otherwise the range you're in (50% if below it).
+  const pctN = x => Math.round(x.p*100);
+  function selTier(q){ const cur = tierFor(q.pct); return state.bTier!=null ? TIERS[state.bTier] : (cur || TIERS[0]); }
   function renderBonus(){
     const q = quarterStats();
-    const cur = tierFor(q.pct), next = TIERS.find(x=>q.pct < x.p-1e-9);
-    $("bPct").textContent = pctTxt(q.pct);
-    $("bPctSub").textContent = fmtMins(q.achieved)+" logged of "+fmtMins(q.available);
-    $("bNow").textContent = cur ? gbp(cur.b) : "£0";
-    $("bNowSub").textContent = cur ? (Math.round(cur.p*100))+"% tier reached" : "Bonus starts at 50%";
-    $("bPace").textContent = fmtMins(q.available);
-    $("bPaceSub").textContent = q.days+" working day"+(q.days===1?"":"s")+" × "+HOURS_PER_DAY+"h";
+    const cur = tierFor(q.pct), next = TIERS.find(x=>q.pct < x.p-1e-9), S = selTier(q);
+    // tier buttons
+    $("tierBar").innerHTML = TIERS.map((x,i)=>`<button type="button" data-tier="${i}" aria-pressed="${x===S}" class="${x===cur?"here":""} ${q.pct>=x.p-1e-9?"got":""}" title="${x===cur?"Your current range":""}"><b>${pctN(x)}%</b><small>${gbp(x.b)}</small></button>`).join("");
 
+    const tgt = S.p*q.available, gap = q.achieved - tgt;
+    $("bPct").textContent = fmtMins(q.achieved);
+    $("bPctSub").textContent = pctTxt(q.pct)+" of "+fmtMins(q.available)+" full hours";
+    $("bPaceK").textContent = "Target so far · "+pctN(S)+"%";
+    $("bPace").textContent = fmtMins(tgt);
+    $("bPaceSub").textContent = pctN(S)+"% of "+fmtMins(q.available)+" ("+q.days+" day"+(q.days===1?"":"s")+" × "+HOURS_PER_DAY+"h)";
+    $("bGapK").textContent = gap>=0 ? "Ahead of "+pctN(S)+"%" : "Short of "+pctN(S)+"%";
+    $("bGap").textContent = (gap>=0?"+":"")+fmtMins(gap>=0?gap:-Math.ceil(-gap));
+    $("bGap").className = "v "+(gap>=0?"ahead":"short");
+    $("bGapSub").textContent = gap>=0 ? gbp(S.b)+" tier secured so far" : "log this to be on "+gbp(S.b);
+    $("bNow").textContent = cur ? gbp(cur.b) : "£0";
+    $("bNowSub").textContent = cur ? pctN(cur)+"% range" : "Bonus starts at 50%";
+
+    // tag: how far to the next tier up from where you are
     const pill=$("qPill");
     if(!q.available){ pill.className="pill neutral"; pill.textContent="No working days yet"; }
     else if(cur && !next){ pill.className="pill ok"; pill.textContent="Top tier reached"; }
     else if(next){
       pill.className = cur ? "pill neutral" : "pill behind";
-      pill.textContent = fmtMins(Math.ceil(next.p*q.available - q.achieved))+" to "+gbp(next.b);
+      pill.textContent = fmtMins(Math.ceil(next.p*q.available - q.achieved))+" to hit "+pctN(next)+"%";
     }
 
     $("bFill").style.width = Math.min(100, q.pct*100)+"%";
-    $("bTicks").innerHTML = TIERS.map(x=>`<div class="tick ${q.pct>=x.p-1e-9?"hit":""}" style="left:${x.p*100}%"><span>${Math.round(x.p*100)}%</span></div>`).join("");
+    $("bTicks").innerHTML = TIERS.map(x=>`<div class="tick ${q.pct>=x.p-1e-9?"hit":""}" style="left:${x.p*100}%"><span${x===S?' style="color:var(--ink);font-weight:700"':""}>${Math.round(x.p*100)}%</span></div>`).join("");
     $("qRange").textContent = fmtShort(q.start)+" – "+fmtShort(q.upTo)+" of quarter ending "+fmtShort(q.end);
 
     $("tierRows").innerHTML = TIERS.map(x=>{
       const target = x.p*q.available, need = Math.max(0, target - q.achieved);
-      const hit = q.available>0 && need<=0, isNext = next===x;
-      return `<tr class="${hit?"hit":""} ${isNext?"next":""}"><td>${Math.round(x.p*100)}%</td><td>${gbp(x.b)}</td><td>${fmtMins(target)}</td><td>${hit?`<span class="st">Reached</span>`:fmtMins(Math.ceil(need))}</td></tr>`;
+      const hit = q.available>0 && need<=0;
+      return `<tr class="${hit?"hit":""} ${x===S?"sel":""}" data-tier="${TIERS.indexOf(x)}"><td>${Math.round(x.p*100)}%</td><td>${gbp(x.b)}</td><td>${fmtMins(target)}</td><td>${hit?`<span class="st">Reached</span>`:fmtMins(Math.ceil(need))}</td></tr>`;
     }).join("");
     const bits = [];
     if(q.closedCount) bits.push(q.closedCount+" office-closed day"+(q.closedCount===1?"":"s")+" left out");
     if(q.holDays) bits.push(q.holDays+" holiday day"+(q.holDays===1?"":"s")+" included with no hours");
-    renderFullQuarter();
+    renderFullQuarter(S);
     const qNB = sumMins(nbOnly(state.entries.filter(e=>e.date>=q.start && e.date<=q.upTo)));
     if(qNB) bits.push(fmtMins(qNB)+" on non-billable tickets not counted");
-    $("bNote").textContent = "Target so far = "+HOURS_PER_DAY+"h × each working day from "+fmtShort(q.start)+" to today, including today. It grows by "+HOURS_PER_DAY+"h each working day. "+(bits.length? bits.join(" · ")+".":"");
+    $("bNote").textContent = "Target so far = "+pctN(S)+"% of "+HOURS_PER_DAY+"h × each working day from "+fmtShort(q.start)+" to today, including today. It grows by "+HOURS_PER_DAY+"h each working day. "+(bits.length? bits.join(" · ")+".":"");
   }
 
-  function renderFullQuarter(){
+  function renderFullQuarter(S){
     const f = fullQuarterStats();
     const pct = f.target ? f.logged/f.target : 0;
     const projPct = f.projected!==null && f.target ? f.projected/f.target : null;
     const projTier = projPct!==null ? tierFor(projPct) : null;
-    $("fqTarget").textContent = fmtMins(f.target);
-    $("fqTargetSub").textContent = f.totalDays+" working days × "+HOURS_PER_DAY+"h";
+    const sHrs = S.p*f.target, sNeed = Math.max(0, sHrs - f.logged);
+    $("fqTargetK").textContent = "Quarter target · "+pctN(S)+"%";
+    $("fqTarget").textContent = fmtMins(sHrs);
+    $("fqTargetSub").textContent = pctN(S)+"% of "+fmtMins(f.target)+" ("+f.totalDays+" days × "+HOURS_PER_DAY+"h)";
     $("fqLogged").textContent = fmtMins(f.logged);
     $("fqDays").textContent = String(+f.capLeft.toFixed(1));
     const dl = []; if(f.holLeft) dl.push(String(+f.holLeft.toFixed(1))+" holiday"); if(f.closedLeft) dl.push(f.closedLeft+" office closed");
     $("fqDaysSub").textContent = "incl. today"+(dl.length?" · excl. "+dl.join(", "):"");
-    $("fqLoggedSub").textContent = pctTxt(pct)+" of the quarter target";
+    $("fqLoggedSub").textContent = sNeed ? fmtMins(Math.ceil(sNeed))+" to go for "+pctN(S)+"%" : pctN(S)+"% reached";
     if(projPct===null){
       $("fqBonus").textContent = "—"; $("fqBonusSub").textContent = "Shows once a working day before today has passed";
     } else {
@@ -633,16 +666,11 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
       $("fqBonusSub").textContent = "finishing near "+pctTxt(projPct)+" ("+fmtMins(f.projected)+")";
     }
     const pill = $("fqPill");
-    const nextQ = TIERS.find(x=>pct < x.p-1e-9);
-    if(!nextQ){ pill.className="pill ok"; pill.textContent="Top tier locked in"; }
+    if(!sNeed){ pill.className="pill ok"; pill.textContent=pctN(S)+"% locked in for the quarter"; }
     else {
-      const perDay = f.capLeft ? (nextQ.p*f.target - f.logged)/f.capLeft : Infinity;
-      const target = projTier && TIERS.indexOf(projTier) < TIERS.length-1 ? TIERS[TIERS.indexOf(projTier)+1] : (projTier ? null : TIERS[0]);
-      if(target){
-        const pd = f.capLeft ? (target.p*f.target - f.logged)/f.capLeft : Infinity;
-        pill.className = pd<=DAY ? "pill neutral" : "pill behind";
-        pill.textContent = pd===Infinity ? "Quarter finished" : fmtMins(Math.ceil(pd))+"/day for "+gbp(target.b);
-      } else { pill.className="pill ok"; pill.textContent="On course for top tier"; }
+      const pd = f.capLeft ? sNeed/f.capLeft : Infinity;
+      pill.className = pd<=DAY ? "pill neutral" : "pill behind";
+      pill.textContent = pd===Infinity ? "Quarter finished" : fmtMins(Math.ceil(pd))+"/day for "+pctN(S)+"%";
     }
     $("fqFill").style.width = Math.min(100, pct*100)+"%";
     const mk = $("fqMark");
@@ -652,17 +680,17 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     $("fqRows").innerHTML = TIERS.map(x=>{
       const hours = x.p*f.target, need = Math.max(0, hours - f.logged), hit = need<=0;
       const perDay = f.capLeft ? need/f.capLeft : Infinity;
-      const onPace = projTier===x;
+      const onPace = S===x;
       let pd;
       if(hit) pd = `<span class="st">Reached</span>`;
       else if(perDay===Infinity) pd = `<span class="st" style="color:var(--danger)">Out of time</span>`;
       else pd = fmtMins(Math.ceil(perDay)) + (perDay>DAY ? ` <span class="st" style="color:var(--danger)">over ${HOURS_PER_DAY}h</span>` : "");
-      return `<tr class="${hit?"hit":""} ${onPace?"next":""}"><td>${Math.round(x.p*100)}%</td><td>${gbp(x.b)}</td><td>${fmtMins(hours)}</td><td>${hit?"—":fmtMins(Math.ceil(need))}</td><td>${pd}</td></tr>`;
+      return `<tr class="${hit?"hit":""} ${onPace?"sel":""}" data-tier="${TIERS.indexOf(x)}"><td>${Math.round(x.p*100)}%</td><td>${gbp(x.b)}</td><td>${fmtMins(hours)}</td><td>${hit?"—":fmtMins(Math.ceil(need))}</td><td>${pd}</td></tr>`;
     }).join("");
     const bits = ["Quarter target = "+HOURS_PER_DAY+"h × every working day in the quarter (holidays included, office-closed days left out)."];
     bits.push("“Per day” = what's left to log ÷ your "+(+f.capLeft.toFixed(1))+" working days left (from today, holidays and office-closed days taken out; a half-day holiday counts as half a day).");
     if(f.rate!==null) bits.push("Projection assumes you keep averaging "+fmtMins(f.rate)+" per working day.");
-    bits.push("Highlighted row = the tier you're on course for.");
+    bits.push("Highlighted row = the tier selected above. Tap any row or tier to switch.");
     $("fqNote").textContent = bits.join(" ");
   }
 
@@ -1128,6 +1156,10 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     state.tStatus = state.tStatus==="closed" ? "open" : state.tStatus;
     closeAddTk();
   });
+  // Bonus tier filter: tap a tier (or a table row); tap your current tier again to go back to auto.
+  function pickTier(i){ state.bTier = (state.bTier===i) ? null : i; renderBonus(); }
+  $("tierBar").addEventListener("click", ev=>{ const b=ev.target.closest("[data-tier]"); if(b) pickTier(+b.dataset.tier); });
+  ["tierRows","fqRows"].forEach(id=>$(id).addEventListener("click", ev=>{ const r=ev.target.closest("[data-tier]"); if(r){ state.bTier=+r.dataset.tier; renderBonus(); } }));
   $("nList").addEventListener("input", ev=>{
     const a = ev.target.closest("[data-note]"); if(!a) return;
     const k = a.dataset.note, meta = document.querySelector(`[data-nmeta="${CSS.escape(k)}"]`);
