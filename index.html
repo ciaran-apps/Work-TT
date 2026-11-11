@@ -80,7 +80,7 @@ button.danger{color:var(--danger)}
 .tierbar button.here::after{content:"";position:absolute;top:5px;right:6px;width:6px;height:6px;border-radius:50%;background:var(--ok)}
 .tierbar button.got small{font-weight:600}
 .tierbar button[aria-pressed="true"].here::after{background:var(--accent-ink)}
-@media (max-width:520px){.panel .headline{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 12px}.panel .headline .big .v{font-size:1.55rem}.panel .headline .big .s{font-size:.76rem}}
+@media (max-width:520px){.panel .headline{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 12px;align-items:start}.panel .headline .big .v{font-size:1.55rem}.panel .headline .big .s{font-size:.76rem}}
 .big .v.ahead{color:var(--ok)}
 .big .v.short{color:var(--danger)}
 tr.sel td{background:var(--accent-soft);font-weight:600}
@@ -342,6 +342,24 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
       </table>
     </div>
     <p class="note" id="fqNote"></p>
+  </section>
+
+  <section class="panel" aria-labelledby="ubTitle" data-pane="bonus">
+    <div class="phead">
+      <h2 id="ubTitle">Unbilled work</h2>
+      <span class="pill neutral" id="ubPill">0h this quarter</span>
+    </div>
+    <div class="headline">
+      <div class="big"><span class="k">This quarter</span><span class="v" id="ubQ">0h</span><span class="s" id="ubQSub"></span></div>
+      <div class="big"><span class="k">This week</span><span class="v" id="ubW">0h</span><span class="s" id="ubWSub"></span></div>
+    </div>
+    <div class="tablewrap" id="ubTableWrap">
+      <table>
+        <thead><tr><th>Ticket</th><th>Quarter</th><th>All time</th></tr></thead>
+        <tbody id="ubRows"></tbody>
+      </table>
+    </div>
+    <p class="note" id="ubNote">Time logged on tickets marked non-billable. It's recorded here but not counted towards your bonus.</p>
   </section>
 
   <section class="panel" aria-labelledby="calTitle" data-pane="calendar" hidden>
@@ -640,11 +658,29 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     if(q.closedCount) bits.push(q.closedCount+" office-closed day"+(q.closedCount===1?"":"s")+" left out");
     if(q.holDays) bits.push(q.holDays+" holiday day"+(q.holDays===1?"":"s")+" included with no hours");
     renderFullQuarter(S);
+    renderUnbilled(q);
     const qNB = sumMins(nbOnly(state.entries.filter(e=>e.date>=q.start && e.date<=q.upTo)));
     if(qNB) bits.push(fmtMins(qNB)+" on non-billable tickets not counted");
     $("bNote").textContent = "Target so far = "+pctN(S)+"% of "+HOURS_PER_DAY+"h × each working day from "+fmtShort(q.start)+" to today, including today. It grows by "+HOURS_PER_DAY+"h each working day. "+(bits.length? bits.join(" · ")+".":"");
   }
 
+  // Non-billable tickets: hours this quarter, this week and all time, per ticket
+  function renderUnbilled(q){
+    const nb = nbSet(), all = nbOnly(state.entries, nb), t = todayIso(), wk = weekStart();
+    const inQ = all.filter(e=>e.date>=q.start && e.date<=q.end), inW = all.filter(e=>e.date>=wk && e.date<=t);
+    const qm = sumMins(inQ), wm = sumMins(inW), bill = q.achieved;
+    $("ubPill").textContent = fmtMins(qm)+" this quarter";
+    $("ubQ").textContent = fmtMins(qm);
+    $("ubQSub").textContent = qm ? `alongside ${fmtMins(bill)} billable to date` : "Nothing logged on non-billable tickets";
+    $("ubW").textContent = fmtMins(wm);
+    $("ubWSub").textContent = "since Monday";
+    const by = {};
+    all.forEach(e=>{ const k=entKey(e), d=state.tickets[k]||{}; const r = by[k] ||= { ticket:d.ticket||e.ticket, company:d.company||e.company, title:d.title||"", q:0, a:0 };
+      r.a += q15(e.minutes); if(e.date>=q.start && e.date<=q.end) r.q += q15(e.minutes); });
+    const rows = Object.values(by).sort((a,b)=>b.q-a.q || b.a-a.a);
+    $("ubTableWrap").hidden = !rows.length;
+    $("ubRows").innerHTML = rows.map(r=>`<tr><td style="white-space:normal;font-family:var(--f-body)"><span class="mono">${esc(r.ticket)}</span> · ${esc(r.company)}${r.title?`<br><span class="muted" style="font-family:var(--f-body);font-size:.78rem">${esc(r.title)}</span>`:""}</td><td>${fmtMins(r.q)}</td><td>${fmtMins(r.a)}</td></tr>`).join("");
+  }
   function renderFullQuarter(S){
     const f = fullQuarterStats();
     const pct = f.target ? f.logged/f.target : 0;
