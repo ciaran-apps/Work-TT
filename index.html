@@ -428,7 +428,7 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
       <label class="c2">Billing
         <span class="toggle"><input type="checkbox" id="fNB"> Non-billable ticket</span>
       </label>
-      <p class="hint c6" id="fNbHint" hidden>Non-billable: this time is recorded against the ticket but doesn't count towards your bonus or daily target.</p>
+      <p class="hint c6" id="fNbHint" hidden>Non-billable: this time is recorded against the ticket but doesn't count towards your bonus or daily target. You can enter 0 to log the work as a record only.</p>
       <div class="c6 actions" style="justify-content:flex-end">
         <p class="err" id="formErr" role="alert" style="margin-right:auto"></p>
         <button type="button" id="cancelEdit" hidden>Cancel</button>
@@ -1068,10 +1068,12 @@ td .st{font-family:var(--f-body);font-size:.78rem;font-weight:600}
     // Reuse the existing spelling when this matches a ticket already on the list.
     const known = allTickets().find(t=>norm(t.company)===norm(company) && norm(t.ticket)===norm(ticket));
     if(known){ company=known.company; ticket=known.ticket; }
-    const date=$("fDate").value, rawMins=parseTime($("fTime").value), minutes=rawMins>0 ? q15(rawMins) : null;
+    // Non-billable work can be logged at 0h, just as a record of what was done.
+    const nbZero = $("fNB").checked;
+    const date=$("fDate").value, rawMins=parseTime($("fTime").value), minutes=rawMins>0 ? q15(rawMins) : (nbZero && rawMins===0 ? 0 : null);
     if(!known && company){ const kc = knownCompanies().find(c=>norm(c)===norm(company)); if(kc) company=kc; }
     if(!company || !ticket || !date){ $("formErr").textContent="Add a company, ticket number and date."; return; }
-    if(!minutes || minutes<=0){ $("formErr").textContent="Enter time in hours, like 0.25, 0.75 or 1.5."; return; }
+    if(minutes===null || (minutes<=0 && !nbZero)){ $("formErr").textContent = nbZero ? "Enter time in hours, like 0.25 or 1.5, or 0 to log it as a record only." : "Enter time in hours, like 0.25, 0.75 or 1.5."; return; }
     if(!col){ $("formErr").textContent="Saving isn't available here. Open the page while signed in to claude.ai."; return; }
     const data = { company, ticket, description:$("fDesc").value.trim(), date, minutes, onXsuite:$("fXsuite").checked };
     $("saveBtn").disabled=true;
